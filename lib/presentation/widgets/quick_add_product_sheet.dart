@@ -9,7 +9,6 @@ import '../../core/utils/currency_formatter.dart';
 import 'app_feedback.dart';
 import '../products/product_provider.dart';
 import '../../domain/entities/product.dart';
-import '../receive/receive_screen.dart';
 
 class QuickAddProductSheet extends ConsumerStatefulWidget {
   final dynamic existing;
@@ -23,13 +22,9 @@ class QuickAddProductSheet extends ConsumerStatefulWidget {
 
 class _QuickAddProductSheetState extends ConsumerState<QuickAddProductSheet> {
   final _nameController = TextEditingController();
-  final _priceController = TextEditingController();
   final _costPriceController = TextEditingController();
   final _quantityController = TextEditingController();
   final _categoryController = TextEditingController();
-  final _receiveQtyController = TextEditingController();
-  final _paymentController = TextEditingController();
-  final _totalController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   String? _avatarPath;
 
@@ -43,42 +38,24 @@ class _QuickAddProductSheetState extends ConsumerState<QuickAddProductSheet> {
     if (_isEditing) {
       final p = widget.existing as Product;
       _nameController.text = p.name;
-      _priceController.text = p.price.toStringAsFixed(2);
+      final cost = p.costPrice > 0 ? p.costPrice : (p.price > 0 ? p.price : 0.0);
       _costPriceController.text =
-          p.costPrice > 0 ? p.costPrice.toStringAsFixed(2) : '';
+          cost > 0 ? _numFmt.format(cost) : '';
       _quantityController.text = p.quantity.toString();
       _categoryController.text = p.category ?? '';
       _avatarPath = p.imagePath;
-      _receiveQtyController.text = '0';
-      _paymentController.text = '0';
     } else {
       _quantityController.text = '0';
-      _receiveQtyController.text = '0';
-      _paymentController.text = '0';
     }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _priceController.dispose();
     _costPriceController.dispose();
     _quantityController.dispose();
     _categoryController.dispose();
-    _receiveQtyController.dispose();
-    _paymentController.dispose();
-    _totalController.dispose();
     super.dispose();
-  }
-
-  void _updateTotal() {
-    final price = CurrencyInputFormatter.parse(_priceController.text);
-    final qty = int.tryParse(_receiveQtyController.text.trim()) ?? 0;
-    if (price > 0 && qty > 0) {
-      _totalController.text = _numFmt.format(price * qty);
-    } else {
-      _totalController.text = '';
-    }
   }
 
   Future<void> _pickAvatar() async {
@@ -102,12 +79,9 @@ class _QuickAddProductSheetState extends ConsumerState<QuickAddProductSheet> {
     AppFeedback.showLoading(context);
     try {
       final name = _nameController.text.trim();
-      final price = double.parse(_priceController.text.trim().replaceAll(',', ''));
       final costPrice = CurrencyInputFormatter.parse(_costPriceController.text);
       final quantity = int.parse(_quantityController.text.trim());
       final category = _categoryController.text.trim().isEmpty ? null : _categoryController.text.trim();
-      final receiveQty = int.tryParse(_receiveQtyController.text.trim()) ?? 0;
-      final payment = CurrencyInputFormatter.parse(_paymentController.text);
 
       final notifier = ref.read(productNotifierProvider.notifier);
       if (_isEditing) {
@@ -115,7 +89,7 @@ class _QuickAddProductSheetState extends ConsumerState<QuickAddProductSheet> {
         await notifier.updateProduct(
           existing.copyWith(
             name: name,
-            price: price,
+            price: 0.0,
             costPrice: costPrice,
             quantity: quantity,
             category: category,
@@ -127,21 +101,11 @@ class _QuickAddProductSheetState extends ConsumerState<QuickAddProductSheet> {
       } else {
         await notifier.addProduct(
           name: name,
-          price: price,
+          price: 0.0,
           costPrice: costPrice,
           quantity: quantity,
           category: category,
           imagePath: _avatarPath,
-        );
-      }
-
-      // If receive quantity is entered, log it to the receive ledger
-      if (receiveQty > 0) {
-        await ref.read(receiveNotifierProvider.notifier).add(
-          product: name,
-          price: price,
-          qty: receiveQty,
-          payment: payment,
         );
       }
 
@@ -168,7 +132,6 @@ class _QuickAddProductSheetState extends ConsumerState<QuickAddProductSheet> {
     const textPrimary = Color(0xFF0F172A);
     const textMuted = Color(0xFF64748B);
     const borderColor = Color(0xFFE2E8F0);
-    const accentReceive = Color(0xFF10B981);
 
     return DraggableScrollableSheet(
       expand: false,
@@ -262,33 +225,9 @@ class _QuickAddProductSheetState extends ConsumerState<QuickAddProductSheet> {
               ),
               const SizedBox(height: 14),
 
-              // Selling Price & Cost Price in a Row
+              // Cost Price & Quantity in a Row
               Row(
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _lbl('Selling Price *', textMuted),
-                        TextFormField(
-                          controller: _priceController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          inputFormatters: [CurrencyInputFormatter()],
-                          decoration: const InputDecoration(
-                            hintText: '0.00',
-                            prefixText: '₦ ',
-                          ),
-                          onChanged: (_) => setState(_updateTotal),
-                          validator: (v) {
-                            if (v!.trim().isEmpty) return 'Required';
-                            if (double.tryParse(v.replaceAll(',', '')) == null) return 'Invalid';
-                            return null;
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -306,18 +245,23 @@ class _QuickAddProductSheetState extends ConsumerState<QuickAddProductSheet> {
                       ],
                     ),
                   ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _lbl('Quantity in Stock *', textMuted),
+                        TextFormField(
+                          controller: _quantityController,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          decoration: const InputDecoration(hintText: '0'),
+                          validator: (v) => v!.trim().isEmpty ? 'Required' : null,
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
-              ),
-              const SizedBox(height: 14),
-
-              // Quantity in Stock
-              _lbl('Quantity in Stock *', textMuted),
-              TextFormField(
-                controller: _quantityController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(hintText: '0'),
-                validator: (v) => v!.trim().isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: 14),
 
@@ -392,111 +336,6 @@ class _QuickAddProductSheetState extends ConsumerState<QuickAddProductSheet> {
                     },
                   );
                 },
-              ),
-              const SizedBox(height: 20),
-
-              // ─── Receive & Payment Section ────────────────────────────────
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: accentReceive.withOpacity(0.04),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: accentReceive.withOpacity(0.18)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: accentReceive.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(Icons.arrow_circle_down_rounded, size: 16, color: accentReceive),
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Receive & Payment',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF0F172A),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: accentReceive.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Text(
-                            'Optional',
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: accentReceive),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Fill in to log this stock inward to the Receive ledger.',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Receive Qty & Payment in a Row
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _lbl('Receive Qty', textMuted),
-                              TextFormField(
-                                controller: _receiveQtyController,
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                                decoration: const InputDecoration(hintText: '0'),
-                                onChanged: (_) => setState(_updateTotal),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _lbl('Payment Made (₦)', textMuted),
-                              TextFormField(
-                                controller: _paymentController,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                inputFormatters: [CurrencyInputFormatter()],
-                                decoration: const InputDecoration(hintText: '0.00'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Total Amount (read-only)
-                    _lbl('Total Receive Amount (₦)', textMuted),
-                    TextFormField(
-                      controller: _totalController,
-                      readOnly: true,
-                      decoration: InputDecoration(
-                        hintText: '0.00',
-                        prefixText: '₦ ',
-                        filled: true,
-                        fillColor: accentReceive.withOpacity(0.06),
-                      ),
-                    ),
-                  ],
-                ),
               ),
               const SizedBox(height: 28),
 

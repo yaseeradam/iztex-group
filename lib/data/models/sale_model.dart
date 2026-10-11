@@ -121,14 +121,16 @@ class SaleModel extends HiveObject {
       );
 
   factory SaleModel.fromMap(Map<String, dynamic> map) => SaleModel(
-        id: map['id'] as String,
-        items: (map['items'] as List)
+        id: map['id']?.toString() ?? '',
+        items: (map['items'] as List? ?? [])
             .map((e) => SaleItemModel.fromMap(e as Map<String, dynamic>))
             .toList(),
-        totalAmount: (map['totalAmount'] as num).toDouble(),
+        totalAmount: (map['totalAmount'] as num?)?.toDouble() ?? 0.0,
         customerId: map['customerId'] as String?,
         customerName: map['customerName'] as String?,
-        saleDate: DateTime.parse(map['saleDate'] as String),
+        saleDate: DateTime.tryParse(map['saleDate']?.toString() ?? '') ??
+            DateTime.tryParse(map['updatedAt']?.toString() ?? '') ??
+            DateTime.now(),
         paymentMethod: map['paymentMethod'] as String? ?? 'cash',
         isSynced: true,
       );
@@ -140,6 +142,7 @@ class SaleModel extends HiveObject {
         'customerId': customerId,
         'customerName': customerName,
         'saleDate': saleDate.toIso8601String(),
+        'updatedAt': saleDate.toIso8601String(),
         'paymentMethod': paymentMethod,
       };
 }

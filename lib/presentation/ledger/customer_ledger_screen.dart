@@ -2121,7 +2121,7 @@ class _AddEntrySheetState extends ConsumerState<_AddEntrySheet> {
                 const SizedBox(height: 14),
                 Row(children: [
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text('Price (₦)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textMuted)),
+                    const Text('Selling Price (₦) *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textMuted)),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _priceController,
@@ -2129,7 +2129,7 @@ class _AddEntrySheetState extends ConsumerState<_AddEntrySheet> {
                       inputFormatters: [CurrencyInputFormatter()],
                       decoration: const InputDecoration(hintText: '0'),
                       onChanged: (_) => _updateTotal(),
-                      validator: (v) => v!.trim().isEmpty ? 'Required' : null,
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Selling price is required' : null,
                     ),
                   ])),
                   const SizedBox(width: 12),

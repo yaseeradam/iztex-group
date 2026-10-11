@@ -93,7 +93,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('Error: $e', style: const TextStyle(color: AppTheme.errorColor))),
             data: (products) {
-              final totalValue = products.fold<double>(0, (s, p) => s + p.price * p.quantity);
+              final totalValue = products.fold<double>(0, (s, p) => s + (p.costPrice > 0 ? p.costPrice : p.price) * p.quantity);
               final lowStock = products.where((p) => p.quantity < 5).length;
 
               final query = ref.watch(productSearchProvider).toLowerCase();
@@ -344,11 +344,11 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       );
     }
 
-    const double productWidth = 160;
-    const double categoryWidth = 90;
-    const double priceWidth = 90;
+    const double productWidth = 150;
+    const double categoryWidth = 85;
+    const double priceWidth = 105;
     const double qtyWidth = 60;
-    const double totalWidth = 110;
+    const double totalWidth = 120;
     const double totalTableWidth = productWidth + categoryWidth + priceWidth + qtyWidth + totalWidth;
 
     const accentColor = Color(0xFF10B981);
@@ -357,7 +357,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     double totalAssetValue = 0;
     int totalQty = 0;
     for (final p in filtered) {
-      totalAssetValue += p.price * p.quantity;
+      final unitCost = p.costPrice > 0 ? p.costPrice : p.price;
+      totalAssetValue += unitCost * p.quantity;
       totalQty += p.quantity as int;
     }
 
@@ -397,7 +398,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                       children: [
                         _buildHeaderCell('Product', width: productWidth),
                         _buildHeaderCell('Category', width: categoryWidth),
-                        _buildHeaderCell('Price (₦)', width: priceWidth, alignment: Alignment.centerRight),
+                        _buildHeaderCell('Cost Price (₦)', width: priceWidth, alignment: Alignment.centerRight),
                         _buildHeaderCell('Quantity', width: qtyWidth, alignment: Alignment.center),
                         _buildHeaderCell('Total Value (₦)', width: totalWidth, alignment: Alignment.centerRight, showRightDivider: false),
                       ],
@@ -412,9 +413,10 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                     final style = ProductStyleUtil.getStyle(product.category, product.name);
                     final rowAccentColor = style.colors.first;
 
-                    final priceStr = '₦${_fmt.format(product.price)}';
+                    final unitCost = product.costPrice > 0 ? product.costPrice : product.price;
+                    final priceStr = '₦${_fmt.format(unitCost)}';
                     final qtyStr = product.quantity.toString();
-                    final totalStr = '₦${_fmt.format(product.price * product.quantity)}';
+                    final totalStr = '₦${_fmt.format(unitCost * product.quantity)}';
 
                     return Material(
                       color: rowBgColor,
@@ -680,28 +682,33 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                           ],
                         ),
                       ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            '₦${_fmt.format(currentEntry.price * currentEntry.quantity)}',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              color: accentColor,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '₦${_fmt.format(currentEntry.price)} / unit',
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
-                      ),
+                        Builder(
+                          builder: (context) {
+                            final unitCost = currentEntry.costPrice > 0 ? currentEntry.costPrice : currentEntry.price;
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  '₦${_fmt.format(unitCost * currentEntry.quantity)}',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w900,
+                                    color: accentColor,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '₦${_fmt.format(unitCost)} / unit',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
                     ],
                   ),
                 ),
@@ -768,7 +775,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                     child: const Icon(Icons.edit_outlined, color: Color(0xFF3B82F6), size: 20),
                   ),
                   title: const Text('Edit Product Details', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                  subtitle: const Text('Modify name, category, or unit price', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                  subtitle: const Text('Modify name, category, or cost price', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                   onTap: () {
                     Navigator.pop(ctx);
                     _showAddSheet(context, existing: currentEntry);
@@ -834,6 +841,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       child: pw.Text(t, style: pw.TextStyle(fontSize: 8, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
     );
 
+    final unitCost = (product.costPrice != null && product.costPrice > 0) ? product.costPrice : product.price;
+
     pdf.addPage(pw.Page(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(24),
@@ -861,7 +870,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                 children: [
                   hCell('Product Name'),
                   hCell('Category'),
-                  hCell('Unit Price (₦)', alignment: pw.Alignment.centerRight),
+                  hCell('Cost Price (₦)', alignment: pw.Alignment.centerRight),
                   hCell('Qty in Stock', alignment: pw.Alignment.center),
                   hCell('Asset Value', alignment: pw.Alignment.centerRight),
                 ],
@@ -870,9 +879,9 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                 children: [
                   dCell(product.name, bold: true),
                   dCell(product.category ?? 'Other'),
-                  dCell('${PdfTheme.naira}${fmt.format(product.price)}', alignment: pw.Alignment.centerRight),
+                  dCell('${PdfTheme.naira}${fmt.format(unitCost)}', alignment: pw.Alignment.centerRight),
                   dCell('${product.quantity}', alignment: pw.Alignment.center),
-                  dCell('${PdfTheme.naira}${fmt.format(product.price * product.quantity)}', bold: true, alignment: pw.Alignment.centerRight),
+                  dCell('${PdfTheme.naira}${fmt.format(unitCost * product.quantity)}', bold: true, alignment: pw.Alignment.centerRight),
                 ],
               ),
             ],
@@ -1003,42 +1012,57 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(height: 4),
-                                  Text(
-                                    'Category: ${product.category ?? "Other"}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFF1D4ED8),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '₦${fmt.format(product.price)} × ${product.quantity}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFF475569),
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                  Builder(
+                                    builder: (context) {
+                                      final unitCost = (product.costPrice != null && product.costPrice > 0) ? product.costPrice : product.price;
+                                      return Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Category: ${product.category ?? "Other"}',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Color(0xFF1D4ED8),
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            '₦${fmt.format(unitCost)} × ${product.quantity}',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Color(0xFF475569),
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    },
                                   ),
                                 ],
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  '₦${fmt.format(product.price * product.quantity)}',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w900,
-                                    color: accentColor,
-                                  ),
-                                ),
-                              ],
+                            Builder(
+                              builder: (context) {
+                                final unitCost = (product.costPrice != null && product.costPrice > 0) ? product.costPrice : product.price;
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      '₦${fmt.format(unitCost * product.quantity)}',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w900,
+                                        color: accentColor,
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -1080,7 +1104,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     double totalAssetValue = 0;
     int totalQty = 0;
     for (final p in products) {
-      totalAssetValue += p.price * p.quantity;
+      final unitCost = (p.costPrice != null && p.costPrice > 0) ? p.costPrice : p.price;
+      totalAssetValue += unitCost * p.quantity;
       totalQty += p.quantity as int;
     }
 
@@ -1099,18 +1124,21 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
           children: [
             pw.TableRow(
               decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-              children: ['S/N', 'Product Name', 'Category', 'Price', 'Qty', 'Stock Value']
+              children: ['S/N', 'Product Name', 'Category', 'Cost Price', 'Qty', 'Stock Value']
                   .map((h) => pw.Padding(padding: const pw.EdgeInsets.all(4),
                       child: pw.Text(h, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))))
                   .toList(),
             ),
-            ...products.asMap().entries.map((e) => pw.TableRow(children: [
-              _cCell('${e.key + 1}'), _cCell(e.value.name),
-              _cCell(e.value.category ?? 'Other'),
-              _cCell('${PdfTheme.naira}${fmt.format(e.value.price)}'),
-              _cCell('${e.value.quantity}'),
-              _cCell('${PdfTheme.naira}${fmt.format(e.value.price * e.value.quantity)}'),
-            ])),
+            ...products.asMap().entries.map((e) {
+              final unitCost = (e.value.costPrice != null && e.value.costPrice > 0) ? e.value.costPrice : e.value.price;
+              return pw.TableRow(children: [
+                _cCell('${e.key + 1}'), _cCell(e.value.name),
+                _cCell(e.value.category ?? 'Other'),
+                _cCell('${PdfTheme.naira}${fmt.format(unitCost)}'),
+                _cCell('${e.value.quantity}'),
+                _cCell('${PdfTheme.naira}${fmt.format(unitCost * e.value.quantity)}'),
+              ]);
+            }),
             pw.TableRow(
               decoration: const pw.BoxDecoration(color: PdfColors.grey100),
               children: [
@@ -1188,7 +1216,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                         children: [
                           TableRow(
                             decoration: BoxDecoration(color: headerBg),
-                            children: ['S/N', 'Product Name', 'Category', 'Price', 'Qty', 'Stock Value']
+                            children: ['S/N', 'Product Name', 'Category', 'Cost Price', 'Qty', 'Stock Value']
                                 .map((h) => Padding(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                                       child: Text(h, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: textColor)),
@@ -1199,15 +1227,16 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                             final i = e.key;
                             final entry = e.value;
                             final rowBg = i.isEven ? bg : (isDark ? const Color(0xFF1A2535) : const Color(0xFFF8FAFC));
+                            final unitCost = (entry.costPrice != null && entry.costPrice > 0) ? entry.costPrice : entry.price;
                             return TableRow(
                               decoration: BoxDecoration(color: rowBg),
                               children: [
                                 _tCell('${i + 1}', mutedColor),
                                 _tCell(entry.name, textColor, bold: true),
                                 _tCell(entry.category ?? 'Other', AppTheme.primaryColor),
-                                _tCell('\u20a6${fmt.format(entry.price)}', textColor),
+                                _tCell('\u20a6${fmt.format(unitCost)}', textColor),
                                 _tCell('${entry.quantity}', textColor),
-                                _tCell('\u20a6${fmt.format(entry.price * entry.quantity)}', AppTheme.successColor, bold: true),
+                                _tCell('\u20a6${fmt.format(unitCost * entry.quantity)}', AppTheme.successColor, bold: true),
                               ],
                             );
                           }),

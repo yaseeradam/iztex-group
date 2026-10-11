@@ -271,22 +271,16 @@ List<ReceiveUiRow> buildUiRows(List<ReceiveEntry> entries) {
     }
   }
   return rows..sort((a, b) {
-    // Compare day part first
-    final dayA = DateTime(a.displayDate.year, a.displayDate.month, a.displayDate.day);
-    final dayB = DateTime(b.displayDate.year, b.displayDate.month, b.displayDate.day);
-    final dayCmp = dayA.compareTo(dayB);
-    if (dayCmp != 0) return dayCmp;
+    // 1. Compare actual date and time chronologically (new data comes down)
+    final timeCmp = a.displayDate.compareTo(b.displayDate);
+    if (timeCmp != 0) return timeCmp;
 
-    // Same day: Deliveries first, Payments second
+    // 2. If exact same timestamp (e.g. from same entry split into delivery and payment):
     final aIsPayment = a.isPaymentRow;
     final bIsPayment = b.isPaymentRow;
     if (aIsPayment != bIsPayment) {
       return aIsPayment ? 1 : -1;
     }
-
-    // Same day and same type: sort by actual time
-    final timeCmp = a.displayDate.compareTo(b.displayDate);
-    if (timeCmp != 0) return timeCmp;
 
     return a.id.compareTo(b.id);
   });
@@ -341,8 +335,8 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
               ),
               IconButton(
                 icon: const Icon(Icons.add_rounded, color: AppTheme.successColor),
-                tooltip: 'Record Received Stock',
-                onPressed: () => _showAddSheet(context),
+                tooltip: 'Record Stock or Payment',
+                onPressed: () => _showAddSelectionSheet(context),
               ),
             ],
           ),
@@ -380,7 +374,8 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
                     ),
                     const SizedBox(height: 16),
                     _QuickActionButtons(
-                      onRecordReceived: () => _showAddSheet(context),
+                      onAddStock: () => _showAddEntrySheet(context, isStock: true),
+                      onAddPayment: () => _showAddEntrySheet(context, isStock: false),
                     ),
                     const SizedBox(height: 16),
                     _ReceiveFeed(
@@ -391,7 +386,12 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
                       borderColor: borderColor,
                       textPrimary: textPrimary,
                       textMuted: textMuted,
-                      onEdit: (e) => _showAddSheet(context, existing: e),
+                      onEdit: (e) {
+                        final isPayment = e.productName.trim().isEmpty ||
+                            e.productName.trim().toLowerCase() == 'payment only' ||
+                            (e.price == 0 && e.quantity == 0 && (e.payment ?? 0) > 0);
+                        _showAddEntrySheet(context, existing: e, isStock: !isPayment);
+                      },
                       onDelete: (e) => _confirmDelete(context, e),
                       onExport: (e) => _showRowExportSheet(context, e, authState),
                     ),
@@ -406,12 +406,93 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
     );
   }
 
-  void _showAddSheet(BuildContext context, {ReceiveEntry? existing}) {
+  void _showAddSelectionSheet(BuildContext context) {
+    const bg = Colors.white;
+    const textPrimary = Color(0xFF0F172A);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Select Transaction Type',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: textPrimary),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Choose whether to record received stock or payment made',
+              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF3B82F6), size: 22),
+              ),
+              title: const Text('Add Received Stock (IN)', style: TextStyle(fontWeight: FontWeight.w700, color: textPrimary)),
+              subtitle: const Text('Record fabric or stock received into inventory', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showAddEntrySheet(context, isStock: true);
+              },
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFECFDF5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF10B981), size: 22),
+              ),
+              title: const Text('Add Payment (OUT)', style: TextStyle(fontWeight: FontWeight.w700, color: textPrimary)),
+              subtitle: const Text('Record payment made to supplier / vendor', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showAddEntrySheet(context, isStock: false);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddEntrySheet(BuildContext context, {ReceiveEntry? existing, bool isStock = true}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _ReceiveEntrySheet(existing: existing),
+      builder: (_) => _ReceiveEntrySheet(
+        existing: existing,
+        initialIsStock: isStock,
+      ),
     );
   }
 
@@ -1366,43 +1447,100 @@ class _FinancialSummaryCard extends StatelessWidget {
 }
 
 class _QuickActionButtons extends StatelessWidget {
-  final VoidCallback onRecordReceived;
+  final VoidCallback onAddStock;
+  final VoidCallback onAddPayment;
 
   const _QuickActionButtons({
-    required this.onRecordReceived,
+    required this.onAddStock,
+    required this.onAddPayment,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: InkWell(
-        onTap: onRecordReceived,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFECFDF5),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF10B981).withOpacity(0.2)),
-          ),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.add_rounded, size: 18, color: Color(0xFF10B981)),
-              SizedBox(width: 8),
-              Text(
-                'Record Received Stock (IN)',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF10B981),
+    return Row(
+      children: [
+        Expanded(
+          child: InkWell(
+            onTap: onAddStock,
+            borderRadius: BorderRadius.circular(14),
+            child: Ink(
+              height: 48,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
-            ],
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add_circle_outline_rounded, color: Colors.white, size: 18),
+                  SizedBox(width: 6),
+                  Text(
+                    'Add Stock (IN)',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
-      ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: InkWell(
+            onTap: onAddPayment,
+            borderRadius: BorderRadius.circular(14),
+            child: Ink(
+              height: 48,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF10B981), Color(0xFF047857)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 18),
+                  SizedBox(width: 6),
+                  Text(
+                    'Add Payment (OUT)',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1967,7 +2105,12 @@ class _ReceiveFeed extends StatelessWidget {
 
 class _ReceiveEntrySheet extends ConsumerStatefulWidget {
   final ReceiveEntry? existing;
-  const _ReceiveEntrySheet({this.existing});
+  final bool initialIsStock;
+
+  const _ReceiveEntrySheet({
+    this.existing,
+    this.initialIsStock = true,
+  });
 
   @override
   ConsumerState<_ReceiveEntrySheet> createState() => _ReceiveEntrySheetState();
@@ -1975,14 +2118,15 @@ class _ReceiveEntrySheet extends ConsumerStatefulWidget {
 
 class _ReceiveEntrySheetState extends ConsumerState<_ReceiveEntrySheet> {
   final _formKey = GlobalKey<FormState>();
-  final _productCtrl = TextEditingController();
-  final _paymentCtrl = TextEditingController();
-  final _priceCtrl = TextEditingController();
-  final _qtyCtrl = TextEditingController();
-  final _totalCtrl = TextEditingController();
-  final _balanceCtrl = TextEditingController();
-  final _descriptionCtrl = TextEditingController();
 
+  final _productController = TextEditingController();
+  final _priceController = TextEditingController();
+  final _qtyController = TextEditingController();
+  final _amountController = TextEditingController();
+  final _outItemController = TextEditingController();
+  final _outAmountController = TextEditingController();
+
+  bool _isStock = true;
   final _numFmt = NumberFormat('#,##0.##', 'en_US');
 
   @override
@@ -1990,111 +2134,117 @@ class _ReceiveEntrySheetState extends ConsumerState<_ReceiveEntrySheet> {
     super.initState();
     if (widget.existing != null) {
       final e = widget.existing!;
-      _productCtrl.text = e.productName;
-      _paymentCtrl.text = _numFmt.format(e.payment ?? 0.0);
-      _priceCtrl.text = e.price == 0.0 ? '' : _numFmt.format(e.price);
-      _qtyCtrl.text = e.quantity == 0 ? '' : e.quantity.toString();
-      _totalCtrl.text = _numFmt.format(e.totalAmount);
-      final balance = e.totalAmount - (e.payment ?? 0.0);
-      _balanceCtrl.text = _numFmt.format(balance < 0 ? 0 : balance);
-      _descriptionCtrl.text = e.description ?? '';
+      final isPayment = e.productName.trim().isEmpty ||
+          e.productName.trim().toLowerCase() == 'payment only' ||
+          (e.price == 0 && e.quantity == 0 && (e.payment ?? 0) > 0);
+      _isStock = !isPayment;
+      if (_isStock) {
+        _productController.text = e.productName;
+        _priceController.text = e.price > 0 ? _numFmt.format(e.price) : '';
+        _qtyController.text = e.quantity > 0 ? e.quantity.toString() : '';
+        _amountController.text = _numFmt.format(e.totalAmount);
+      } else {
+        _outItemController.text = (e.description != null && e.description!.trim().isNotEmpty && e.description != 'PAYMENT')
+            ? e.description!
+            : (e.productName.isNotEmpty && e.productName.toLowerCase() != 'payment only' ? e.productName : '');
+        _outAmountController.text = _numFmt.format(e.payment ?? 0.0);
+      }
     } else {
-      _paymentCtrl.text = '0';
-      _balanceCtrl.text = '0';
-      _totalCtrl.text = '0';
+      _isStock = widget.initialIsStock;
     }
   }
 
   @override
   void dispose() {
-    _productCtrl.dispose(); _paymentCtrl.dispose();
-    _priceCtrl.dispose(); _qtyCtrl.dispose(); _totalCtrl.dispose();
-    _balanceCtrl.dispose(); _descriptionCtrl.dispose();
+    _productController.dispose();
+    _priceController.dispose();
+    _qtyController.dispose();
+    _amountController.dispose();
+    _outItemController.dispose();
+    _outAmountController.dispose();
     super.dispose();
   }
 
   void _updateTotal() {
-    final p = CurrencyInputFormatter.parse(_priceCtrl.text);
-    final q = int.tryParse(_qtyCtrl.text) ?? 0;
-    if (p > 0 && q > 0) {
-      final total = p * q;
-      _totalCtrl.text = _numFmt.format(total);
-      final paid = CurrencyInputFormatter.parse(_paymentCtrl.text);
-      final balance = total - paid;
-      _balanceCtrl.text = _numFmt.format(balance < 0 ? 0.0 : balance);
+    final price = CurrencyInputFormatter.parse(_priceController.text);
+    final qty = int.tryParse(_qtyController.text) ?? 0;
+    if (price > 0 && qty > 0) {
+      _amountController.text =
+          NumberFormat('#,##0', 'en_US').format(price * qty);
     } else {
-      final total = CurrencyInputFormatter.parse(_totalCtrl.text);
-      final paid = CurrencyInputFormatter.parse(_paymentCtrl.text);
-      final balance = total - paid;
-      _balanceCtrl.text = _numFmt.format(balance < 0 ? 0.0 : balance);
+      _amountController.text = '';
     }
-    if (mounted) setState(() {});
-  }
-
-  void _updateBalance() {
-    final p = CurrencyInputFormatter.parse(_priceCtrl.text);
-    final q = int.tryParse(_qtyCtrl.text) ?? 0;
-    final paid = CurrencyInputFormatter.parse(_paymentCtrl.text);
-
-    if (p > 0 && q > 0) {
-      final total = p * q;
-      final balance = total - paid;
-      _balanceCtrl.text = _numFmt.format(balance < 0 ? 0.0 : balance);
-    } else {
-      var total = CurrencyInputFormatter.parse(_totalCtrl.text);
-      if (total < paid) {
-        total = paid;
-        _totalCtrl.text = _numFmt.format(total);
-      }
-      final balance = total - paid;
-      _balanceCtrl.text = _numFmt.format(balance < 0 ? 0.0 : balance);
-    }
-    if (mounted) setState(() {});
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     final notifier = ref.read(receiveNotifierProvider.notifier);
-    final paymentVal = CurrencyInputFormatter.parse(_paymentCtrl.text);
-    final productName = _productCtrl.text.trim();
-    final priceVal = CurrencyInputFormatter.parse(_priceCtrl.text);
-    final qtyVal = int.tryParse(_qtyCtrl.text.trim()) ?? 0;
-    final totalVal = CurrencyInputFormatter.parse(_totalCtrl.text);
-    final descriptionVal = _descriptionCtrl.text.trim();
 
-    DateTime? paymentDateVal;
     if (widget.existing != null) {
       final e = widget.existing!;
-      if (paymentVal != (e.payment ?? 0.0)) {
-        paymentDateVal = DateTime.now();
+      if (_isStock) {
+        final price = CurrencyInputFormatter.parse(_priceController.text);
+        final qty = int.tryParse(_qtyController.text) ?? 1;
+        final total = CurrencyInputFormatter.parse(_amountController.text);
+        final updated = ReceiveEntry(
+          id: e.id,
+          date: e.date,
+          productName: _productController.text.trim(),
+          companyName: e.companyName,
+          price: price,
+          quantity: qty,
+          totalAmount: total > 0 ? total : price * qty,
+          payment: e.payment ?? 0.0,
+          paymentDate: e.paymentDate,
+          description: e.description ?? '',
+        );
+        await notifier.update(updated);
       } else {
-        paymentDateVal = e.paymentDate;
+        final amount = CurrencyInputFormatter.parse(_outAmountController.text);
+        final outDesc = _outItemController.text.trim();
+        final updated = ReceiveEntry(
+          id: e.id,
+          date: e.date,
+          productName: '',
+          companyName: e.companyName,
+          price: 0.0,
+          quantity: 0,
+          totalAmount: 0.0,
+          payment: amount,
+          paymentDate: e.paymentDate ?? DateTime.now(),
+          description: outDesc.isEmpty ? 'PAYMENT' : outDesc,
+        );
+        await notifier.update(updated);
       }
-
-      await notifier.update(ReceiveEntry(
-        id: e.id, date: e.date,
-        productName: productName, companyName: '',
-        price: priceVal,
-        quantity: qtyVal,
-        totalAmount: totalVal,
-        payment: paymentVal,
-        paymentDate: paymentDateVal,
-        description: descriptionVal,
-      ));
     } else {
-      if (paymentVal > 0) {
-        paymentDateVal = DateTime.now();
+      if (_isStock) {
+        final price = CurrencyInputFormatter.parse(_priceController.text);
+        final qty = int.parse(_qtyController.text.trim());
+        final total = CurrencyInputFormatter.parse(_amountController.text);
+        await notifier.add(
+          product: _productController.text.trim(),
+          price: price,
+          qty: qty,
+          totalAmount: total > 0 ? total : price * qty,
+          payment: 0.0,
+          paymentDate: null,
+          description: '',
+        );
+      } else {
+        final amount = CurrencyInputFormatter.parse(_outAmountController.text);
+        final outDesc = _outItemController.text.trim();
+        await notifier.add(
+          product: '',
+          price: 0.0,
+          qty: 0,
+          totalAmount: 0.0,
+          payment: amount,
+          paymentDate: DateTime.now(),
+          description: outDesc.isEmpty ? 'PAYMENT' : outDesc,
+        );
       }
-      await notifier.add(
-        product: productName,
-        price: priceVal,
-        qty: qtyVal,
-        payment: paymentVal,
-        totalAmount: totalVal,
-        paymentDate: paymentDateVal,
-        description: descriptionVal,
-      );
     }
+
     if (mounted) Navigator.pop(context);
   }
 
@@ -2104,253 +2254,220 @@ class _ReceiveEntrySheetState extends ConsumerState<_ReceiveEntrySheet> {
     const textPrimary = Color(0xFF0F172A);
     const textMuted = Color(0xFF64748B);
     const borderColor = Color(0xFFE2E8F0);
-    const accentGreen = Color(0xFF10B981);
-    const accentRed = Color(0xFFEF4444);
 
-    final total = CurrencyInputFormatter.parse(_totalCtrl.text);
-    final paid = CurrencyInputFormatter.parse(_paymentCtrl.text);
-    final balance = total - paid;
-    final isFullyPaid = balance <= 0;
+    final String sheetTitle;
+    if (widget.existing != null) {
+      sheetTitle = _isStock ? 'Edit Stock (IN)' : 'Edit Payment (OUT)';
+    } else {
+      sheetTitle = _isStock ? 'New Stock (IN)' : 'New Payment (OUT)';
+    }
 
-    final priceVal = CurrencyInputFormatter.parse(_priceCtrl.text);
-    final qtyVal = int.tryParse(_qtyCtrl.text.trim()) ?? 0;
-    final isProductsMode = priceVal > 0 && qtyVal > 0;
+    final String sheetSubtitle = _isStock
+        ? 'Record goods / fabric received into inventory'
+        : 'Record payment made to supplier / vendor';
+
+    final String buttonText;
+    if (widget.existing != null) {
+      buttonText = _isStock ? 'Update Stock' : 'Update Payment';
+    } else {
+      buttonText = _isStock ? 'Save Stock' : 'Save Payment';
+    }
 
     return Container(
-      decoration: const BoxDecoration(color: bg, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-      padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+      decoration: const BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+          24, 16, 24, MediaQuery.of(context).viewInsets.bottom + 24),
       child: Form(
         key: _formKey,
         child: SingleChildScrollView(
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // Handle bar
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: borderColor, borderRadius: BorderRadius.circular(2)))),
-            const SizedBox(height: 20),
-
-            // Title row
-            Row(children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: accentGreen.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: borderColor,
+                      borderRadius: BorderRadius.circular(2)),
                 ),
-                child: const Icon(Icons.arrow_circle_down_rounded, color: accentGreen, size: 20),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(height: 20),
               Text(
-                widget.existing != null ? 'Edit Received Item' : 'Record Received Item',
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: textPrimary),
+                sheetTitle,
+                style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: textPrimary),
               ),
-            ]),
-            const SizedBox(height: 20),
+              const SizedBox(height: 4),
+              Text(
+                sheetSubtitle,
+                style: const TextStyle(fontSize: 12, color: textMuted),
+              ),
+              const SizedBox(height: 20),
 
-            // Product Name
-            _label('Product Name', textMuted),
-            TextFormField(
-              controller: _productCtrl,
-              textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(hintText: 'e.g. LIN ROMAN 150y'),
-            ),
-            const SizedBox(height: 14),
-
-            // Price & Quantity
-            Row(children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                _label('Price (₦)', textMuted),
+              // IN fields
+              if (_isStock) ...[
+                const Text('Product / Item Name',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: textMuted)),
+                const SizedBox(height: 8),
                 TextFormField(
-                  controller: _priceCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  controller: _productController,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration:
+                      const InputDecoration(hintText: 'e.g. LIN ROMAN 150y'),
+                  validator: (v) => v!.trim().isEmpty ? 'Required' : null,
+                ),
+                const SizedBox(height: 14),
+                Row(children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Selling Price (₦) *',
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: textMuted)),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _priceController,
+                          keyboardType:
+                              const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [CurrencyInputFormatter()],
+                          decoration: const InputDecoration(hintText: '0'),
+                          onChanged: (_) => _updateTotal(),
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? 'Selling price is required'
+                              : null,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Quantity',
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: textMuted)),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _qtyController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(hintText: '0'),
+                          onChanged: (_) => _updateTotal(),
+                          validator: (v) {
+                            if (v!.trim().isEmpty) return 'Required';
+                            final q = int.tryParse(v.trim());
+                            if (q == null || q <= 0) return 'Must be > 0';
+                            return null;
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 14),
+                const Text('Total Amount (₦)',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: textMuted)),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _amountController,
+                  readOnly: true,
+                  decoration: const InputDecoration(
+                    hintText: '0',
+                    prefixText: '₦ ',
+                    filled: true,
+                    fillColor: Color(0xFFF1F5F9),
+                  ),
+                ),
+              ],
+
+              // OUT fields
+              if (!_isStock) ...[
+                const Text('Bank / Cash Description',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: textMuted)),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _outItemController,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration:
+                      const InputDecoration(hintText: 'e.g. DIAMOND BANK'),
+                  validator: (v) => v!.trim().isEmpty ? 'Required' : null,
+                ),
+                const SizedBox(height: 14),
+                const Text('Amount Paid (₦)',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: textMuted)),
+                const SizedBox(height: 4),
+                Text('Can be partial — supplier can be paid in instalments',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.successColor.withValues(alpha: 0.8))),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _outAmountController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [CurrencyInputFormatter()],
-                  decoration: const InputDecoration(hintText: '0.00', prefixText: '₦ '),
-                  onChanged: (_) => setState(_updateTotal),
+                  decoration:
+                      const InputDecoration(hintText: '0', prefixText: '₦ '),
+                  validator: (v) {
+                    if (v!.trim().isEmpty) return 'Required';
+                    if (CurrencyInputFormatter.parse(v.trim()) <= 0) {
+                      return 'Amount must be > 0';
+                    }
+                    return null;
+                  },
                 ),
-              ])),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                _label('Quantity', textMuted),
-                TextFormField(
-                  controller: _qtyCtrl,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: const InputDecoration(hintText: '0'),
-                  onChanged: (_) => setState(_updateTotal),
-                ),
-              ])),
-            ]),
-            const SizedBox(height: 14),
+              ],
 
-            // Total Amount (read-only)
-            _label('Total Amount (₦)', textMuted),
-            TextFormField(
-              controller: _totalCtrl,
-              readOnly: isProductsMode,
-              keyboardType: isProductsMode ? null : const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: isProductsMode ? null : [CurrencyInputFormatter()],
-              decoration: InputDecoration(
-                hintText: '0.00',
-                prefixText: '₦ ',
-                filled: isProductsMode,
-                fillColor: isProductsMode ? const Color(0xFFF1F5F9) : null,
-              ),
-              onChanged: isProductsMode ? null : (_) => setState(_updateTotal),
-            ),
-            const SizedBox(height: 20),
-
-            // ── Payment & Balance Card ────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: accentGreen.withOpacity(0.04),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: accentGreen.withOpacity(0.2)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Section header
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: accentGreen.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.payments_rounded, size: 16, color: accentGreen),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Payment & Balance',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: textPrimary),
-                      ),
-                      const Spacer(),
-                      // Paid status badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: isFullyPaid
-                              ? accentGreen.withOpacity(0.12)
-                              : accentRed.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          isFullyPaid ? '✓ Fully Paid' : 'Balance Due',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: isFullyPaid ? accentGreen : accentRed,
-                          ),
-                        ),
-                      ),
-                    ],
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: ElevatedButton(
+                  onPressed: _submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isStock
+                        ? AppTheme.primaryColor
+                        : AppTheme.successColor,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
                   ),
-                  const SizedBox(height: 14),
-
-                  // Payment Made & Balance side by side
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _label('Payment Made (₦)', textMuted),
-                            TextFormField(
-                              controller: _paymentCtrl,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              inputFormatters: [CurrencyInputFormatter()],
-                              decoration: InputDecoration(
-                                hintText: '0.00',
-                                prefixText: '₦ ',
-                                filled: true,
-                                fillColor: accentGreen.withOpacity(0.06),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(color: accentGreen, width: 1.5),
-                                ),
-                              ),
-                              onChanged: (_) => setState(_updateBalance),
-                              validator: (v) => v!.trim().isEmpty ? 'Required' : null,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _label('Balance (₦)', textMuted),
-                            TextFormField(
-                              controller: _balanceCtrl,
-                              readOnly: true,
-                              decoration: InputDecoration(
-                                hintText: '0.00',
-                                prefixText: '₦ ',
-                                filled: true,
-                                fillColor: isFullyPaid
-                                    ? accentGreen.withOpacity(0.06)
-                                    : accentRed.withOpacity(0.06),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  borderSide: BorderSide(
-                                    color: isFullyPaid
-                                        ? accentGreen.withOpacity(0.3)
-                                        : accentRed.withOpacity(0.3),
-                                  ),
-                                ),
-                              ),
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: isFullyPaid ? accentGreen : accentRed,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    buttonText,
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Description
-            _label('Description', textMuted),
-            TextFormField(
-              controller: _descriptionCtrl,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                hintText: 'Add description details...',
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Save button
-            SizedBox(
-              width: double.infinity,
-              height: 54,
-              child: ElevatedButton.icon(
-                onPressed: _submit,
-                icon: const Icon(Icons.save_rounded, size: 18),
-                label: Text(
-                  widget.existing != null ? 'Update Entry' : 'Save Entry',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: accentGreen,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
               ),
-            ),
-          ]),
+            ],
+          ),
         ),
       ),
     );
   }
-
-  Widget _label(String t, Color c) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Text(t, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c)),
-  );
 }

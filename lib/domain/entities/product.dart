@@ -13,7 +13,7 @@ class Product {
   const Product({
     required this.id,
     required this.name,
-    required this.price,
+    this.price = 0.0,
     this.costPrice = 0.0,
     required this.quantity,
     this.category,

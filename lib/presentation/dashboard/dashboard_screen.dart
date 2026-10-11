@@ -212,12 +212,22 @@ class _HeroBanner extends StatelessWidget {
                     else
                       Container(width: 7, height: 7,
                           decoration: BoxDecoration(
-                            color: isPending ? AppTheme.warningColor : const Color(0xFF4ADE80),
+                            color: syncStatus == SyncStatus.error
+                                ? const Color(0xFFEF4444)
+                                : isPending
+                                    ? AppTheme.warningColor
+                                    : const Color(0xFF4ADE80),
                             shape: BoxShape.circle,
                           )),
                     const SizedBox(width: 6),
                     Text(
-                      isSyncing ? 'Syncing' : isPending ? 'Pending' : 'Synced',
+                      isSyncing
+                          ? 'Syncing'
+                          : syncStatus == SyncStatus.error
+                              ? 'Sync Failed'
+                              : isPending
+                                  ? 'Pending'
+                                  : 'Synced',
                       style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
                     ),
                   ]),

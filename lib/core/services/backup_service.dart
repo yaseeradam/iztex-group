@@ -87,6 +87,8 @@ class BackupService {
           'runningBalance': sl.runningBalance,
           'typeIndex': sl.typeIndex,
           'personName': sl.personName,
+          'payment': sl.payment,
+          'paymentDate': sl.paymentDate?.toIso8601String(),
         }).toList(),
       };
 
@@ -245,6 +247,10 @@ class BackupService {
             runningBalance: (m['runningBalance'] as num? ?? 0).toDouble(),
             typeIndex: m['typeIndex'] as int,
             personName: m['personName'] as String?,
+            payment: (m['payment'] as num?)?.toDouble(),
+            paymentDate: m['paymentDate'] != null
+                ? DateTime.parse(m['paymentDate'] as String)
+                : null,
           );
           await salesLedgerBox.put(entry.id, entry);
         }

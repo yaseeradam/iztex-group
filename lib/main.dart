@@ -39,6 +39,7 @@ Future<void> main() async {
   await Hive.openBox<ProductModel>('products_$activeShopId');
 
   await Hive.openBox<CustomerModel>('customers_$activeShopId');
+  await Hive.openBox<CustomerModel>('shop_customers_$activeShopId');
 
   await Hive.openBox<DebtModel>('debts_$activeShopId');
   await Hive.openBox<SaleModel>('sales_$activeShopId');

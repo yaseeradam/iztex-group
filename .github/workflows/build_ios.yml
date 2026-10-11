@@ -1,0 +1,48 @@
+﻿name: Build iOS App
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build iOS Release (Unsigned)
+        run: flutter build ios --release --no-codesign
+
+      - name: Package Payload into IPA
+        run: |
+          cd build/ios/iphoneos
+          mkdir Payload
+          cp -r Runner.app Payload/
+          zip -r -q mlintex-release.ipa Payload
+          cd ../../..
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlintex-ios-release-ipa
+          path: build/ios/iphoneos/mlintex-release.ipa
+          retention-days: 14
+
+      - name: Upload Runner.app
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlintex-ios-runner-app
+          path: build/ios/iphoneos/Runner.app
+          retention-days: 14

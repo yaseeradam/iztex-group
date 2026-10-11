@@ -93,16 +93,17 @@ class AuthNotifier extends Notifier<AuthState> {
       return false;
     }
 
-    // Try Firebase Authentication for the authorized account (auto-create on cloud if first time)
+    // Always use canonical email for Firebase Auth so all devices share the exact same UID & Firestore data
+    const canonicalAuthEmail = 'mlintex@gmail.com';
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: cleanEmail,
+        email: canonicalAuthEmail,
         password: password,
       );
     } catch (e) {
       try {
         await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: cleanEmail,
+          email: canonicalAuthEmail,
           password: password,
         );
       } catch (_) {}
@@ -111,6 +112,34 @@ class AuthNotifier extends Notifier<AuthState> {
     final box = Hive.box(_boxName);
     await box.put(_keyLoggedIn, true);
     await box.put(_keyEmail, cleanEmail);
+
+    // Try to restore shops from Firestore if this is a new device
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      try {
+        final profileDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .collection('profile')
+            .doc('shops')
+            .get();
+        if (profileDoc.exists) {
+          final profileData = profileDoc.data();
+          if (profileData != null && profileData['shops'] != null) {
+            final remoteShops = profileData['shops'] as List<dynamic>;
+            if (remoteShops.isNotEmpty) {
+              await box.put(_keyShops, remoteShops);
+              final activeId = profileData['activeShopId']?.toString() ??
+                  remoteShops.first['id']?.toString() ??
+                  '1';
+              await box.put(_keyActiveShopId, activeId);
+            }
+          }
+        }
+      } catch (err) {
+        // Cloud profile pull optional on offline login
+      }
+    }
 
     final rawShops = box.get(_keyShops, defaultValue: <dynamic>[]) as List<dynamic>;
     final activeShopId = box.get(_keyActiveShopId, defaultValue: '1') as String;

@@ -38,7 +38,7 @@ class ProductNotifier extends Notifier<AsyncValue<void>> {
 
   Future<void> addProduct({
     required String name,
-    required double price,
+    double price = 0.0,
     required int quantity,
     double costPrice = 0.0,
     String? category,

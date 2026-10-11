@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/providers/sync_provider.dart';
 import '../widgets/app_feedback.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -79,6 +80,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       AppFeedback.hideLoading(context);
       if (!success) {
         AppFeedback.showError(context, 'Access Denied', 'Invalid credentials or unauthorized account. Please check your details.');
+      } else {
+        // Trigger immediate cloud sync to pull all existing data to the device
+        ref.read(syncServiceProvider).syncAll();
       }
     }
   }

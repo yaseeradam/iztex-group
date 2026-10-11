@@ -86,13 +86,15 @@ class ReceiveOrderModel {
 
   factory ReceiveOrderModel.fromMap(Map<dynamic, dynamic> map) =>
       ReceiveOrderModel(
-        id: map['id'] as String,
-        supplierName: map['supplierName'] as String,
-        items: (map['items'] as List)
+        id: map['id']?.toString() ?? '',
+        supplierName: map['supplierName']?.toString() ?? '',
+        items: (map['items'] as List? ?? [])
             .map((e) => ReceiveOrderItemModel.fromMap(e as Map))
             .toList(),
-        totalAmount: (map['totalAmount'] as num).toDouble(),
-        receivedDate: DateTime.parse(map['receivedDate'] as String),
+        totalAmount: (map['totalAmount'] as num?)?.toDouble() ?? 0.0,
+        receivedDate: DateTime.tryParse(map['receivedDate']?.toString() ?? '') ??
+            DateTime.tryParse(map['updatedAt']?.toString() ?? '') ??
+            DateTime.now(),
         note: map['note'] as String?,
         isSynced: map['isSynced'] as bool? ?? false,
       );
@@ -103,6 +105,7 @@ class ReceiveOrderModel {
         'items': items.map((e) => e.toMap()).toList(),
         'totalAmount': totalAmount,
         'receivedDate': receivedDate.toIso8601String(),
+        'updatedAt': receivedDate.toIso8601String(),
         'note': note,
         'isSynced': isSynced,
       };

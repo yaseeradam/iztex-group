@@ -37,7 +37,7 @@ void main() {
       expect(rows[1].productName, isEmpty);
     });
 
-    test('Same-day sorting order: stock deliveries appear before payments on the same date', () {
+    test('Chronological sorting order: new entries entered later come down, not up', () {
       final List<ReceiveEntry> entries = [
         ReceiveEntry(
           companyName: 'c1',
@@ -62,14 +62,33 @@ void main() {
         ),
       ];
 
-      // Even though the delivery is at 15:00 and payment at 12:00,
-      // on the same day, deliveries should come before payments.
+      // Entry at 12:00 comes first, newer entry at 15:00 comes down (after)
       final rows = buildUiRows(entries);
       expect(rows.length, 2);
-      expect(rows[0].id, 'del');
-      expect(rows[0].isPaymentRow, isFalse);
-      expect(rows[1].id, 'pay');
-      expect(rows[1].isPaymentRow, isTrue);
+      expect(rows[0].id, 'pay');
+      expect(rows[0].isPaymentRow, isTrue);
+      expect(rows[1].id, 'del');
+      expect(rows[1].isPaymentRow, isFalse);
+    });
+
+    test('Same timestamp tiebreaker: stock delivery appears before payment when both on exact same timestamp', () {
+      final List<ReceiveEntry> entries = [
+        ReceiveEntry(
+          companyName: 'c1',
+          id: 'split',
+          date: DateTime(2023, 1, 1, 12),
+          productName: 'Fabric',
+          price: 100,
+          quantity: 1,
+          totalAmount: 100,
+          payment: 50,
+          paymentDate: DateTime(2023, 1, 1, 12),
+        ),
+      ];
+
+      final rows = buildUiRows(entries);
+      expect(rows.length, 1);
+      expect(rows[0].id, 'split');
     });
 
     test('Running balance properly adds stock total and deducts payments', () {
