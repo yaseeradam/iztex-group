@@ -12,6 +12,7 @@ import 'domain/entities/ledger_entry.dart';
 import 'presentation/receive/receive_screen.dart';
 import 'presentation/sales_ledger/sales_ledger_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'core/services/pending_sync_tracker.dart';
 import 'core/services/connectivity_service.dart';
 import 'core/providers/sync_provider.dart';
@@ -19,8 +20,12 @@ import 'core/providers/sync_provider.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
-    await Firebase.initializeApp();
-  } catch (_) {}
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    debugPrint('Firebase.initializeApp error: $e');
+  }
 
   await Hive.initFlutter();
   Hive.registerAdapter(ProductModelAdapter());
