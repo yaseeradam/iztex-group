@@ -1,9 +1,12 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/sync_provider.dart';
+import '../../core/services/pwa_installer.dart';
 import '../widgets/app_feedback.dart';
+import '../widgets/pwa_install_modal.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -52,6 +55,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
     _fadeController.forward();
     _slideController.forward();
+
+    if (kIsWeb && !PwaService.isInstalled && !PwaService.hasPromptedThisSession) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future.delayed(const Duration(milliseconds: 900), () {
+          if (mounted) PwaInstallModal.show(context);
+        });
+      });
+    }
   }
 
   @override

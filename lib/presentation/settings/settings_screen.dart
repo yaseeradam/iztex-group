@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +9,8 @@ import '../../core/providers/auth_provider.dart';
 import '../../data/datasources/sync_service.dart';
 import '../widgets/glass_container.dart';
 import '../../core/services/backup_service.dart';
+import '../../core/services/pwa_installer.dart';
+import '../widgets/pwa_install_modal.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -146,7 +149,7 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
                     ],
                   ),
                 ),
-                Icon(
+                const Icon(
                   Icons.chevron_right_rounded,
                   color: AppTheme.textMuted,
                   size: 20,
@@ -156,6 +159,24 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
           ),
         ),
         const SizedBox(height: 24),
+
+        if (kIsWeb && !PwaService.isInstalled) ...[
+          _SectionHeader('Web App'),
+          _SettingsGroup(
+            children: [
+              _ActionTile(
+                icon: Icons.install_mobile_rounded,
+                iconColor: const Color(0xFF4F46E5),
+                title: 'Install App (PWA)',
+                subtitle: 'Add to Home Screen for offline & fullscreen experience',
+                trailing: const Icon(Icons.chevron_right_rounded,
+                    color: AppTheme.textMuted, size: 20),
+                onTap: () => PwaInstallModal.show(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+        ],
 
         _SectionHeader('Preferences'),
         _SettingsGroup(

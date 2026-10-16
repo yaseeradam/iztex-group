@@ -11,6 +11,10 @@ import '../../core/theme/app_theme.dart';
 import '../../core/providers/sync_provider.dart';
 import '../../data/datasources/sync_service.dart';
 
+import 'package:flutter/foundation.dart';
+import '../../core/services/pwa_installer.dart';
+import 'pwa_install_modal.dart';
+
 class _TabNotifier extends Notifier<int> {
   @override
   int build() => 0;
@@ -20,9 +24,14 @@ class _TabNotifier extends Notifier<int> {
 
 final _currentTabProvider = NotifierProvider<_TabNotifier, int>(_TabNotifier.new);
 
-class AppShell extends ConsumerWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
 
+  @override
+  ConsumerState<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends ConsumerState<AppShell> {
   static const _screens = [
     DashboardScreen(),
     SalesLedgerScreen(),
@@ -34,7 +43,19 @@ class AppShell extends ConsumerWidget {
   ];
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void initState() {
+    super.initState();
+    if (kIsWeb && !PwaService.isInstalled && !PwaService.hasPromptedThisSession) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future.delayed(const Duration(milliseconds: 900), () {
+          if (mounted) PwaInstallModal.show(context);
+        });
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final currentTab = ref.watch(_currentTabProvider);
 
     return Scaffold(

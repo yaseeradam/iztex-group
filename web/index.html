@@ -115,6 +115,44 @@
   </div>
 
   <script>
+    // PWA Install Prompt Capture
+    window.deferredPwaPrompt = null;
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      window.deferredPwaPrompt = e;
+      console.log('[PWA] beforeinstallprompt event captured');
+    });
+
+    window.triggerPwaInstall = function () {
+      if (window.deferredPwaPrompt) {
+        window.deferredPwaPrompt.prompt();
+        window.deferredPwaPrompt.userChoice.then(function (choiceResult) {
+          console.log('[PWA] userChoice outcome:', choiceResult.outcome);
+          window.deferredPwaPrompt = null;
+        }).catch(function (err) {
+          console.error('[PWA] Error in userChoice:', err);
+        });
+        return true;
+      }
+      return false;
+    };
+
+    window.isPwaInstalled = function () {
+      var isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                         window.navigator.standalone === true ||
+                         document.referrer.includes('android-app://');
+      return !!isStandalone;
+    };
+
+    window.canPromptPwaInstall = function () {
+      return window.deferredPwaPrompt !== null;
+    };
+
+    window.isAppleDevice = function () {
+      return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    };
+
     window.addEventListener('flutter-first-frame', function () {
       var splash = document.getElementById('loading-splash');
       if (splash) {
