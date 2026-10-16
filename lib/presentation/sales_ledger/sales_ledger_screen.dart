@@ -275,12 +275,27 @@ class _SalesLedgerScreenState extends ConsumerState<SalesLedgerScreen> {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('Error: $e')),
             data: (entries) {
+              final products = ref.watch(productsProvider).value ?? [];
+              final productCostByName = <String, double>{
+                for (final p in products) p.name.trim().toLowerCase(): p.costPrice,
+              };
+
               double totalIn = 0;
               double totalOut = 0;
+              double totalProfit = 0;
               for (final entry in entries) {
                 if (entry.typeIndex == 1) {
                   totalIn += entry.totalAmount;
                   totalOut += (entry.payment ?? 0.0);
+
+                  final nameKey = (entry.inItem ?? '').trim().toLowerCase();
+                  final cost = productCostByName[nameKey] ?? 0.0;
+                  final unitPrice = entry.price ??
+                      (entry.quantity != null && entry.quantity! > 0
+                          ? entry.totalAmount / entry.quantity!
+                          : entry.totalAmount);
+                  final qty = entry.quantity ?? 1;
+                  totalProfit += (unitPrice - cost) * qty;
                 } else {
                   totalOut += entry.totalAmount;
                 }
@@ -304,6 +319,7 @@ class _SalesLedgerScreenState extends ConsumerState<SalesLedgerScreen> {
                       totalIn: totalIn,
                       totalOut: totalOut,
                       remainingDebt: remainingDebt,
+                      totalProfit: totalProfit,
                       fmt: _fmt,
                     ),
                     const SizedBox(height: 16),
@@ -1196,51 +1212,75 @@ class _FinancialSummaryCard extends StatelessWidget {
   final double totalIn;
   final double totalOut;
   final double remainingDebt;
+  final double totalProfit;
   final NumberFormat fmt;
 
   const _FinancialSummaryCard({
     required this.totalIn,
     required this.totalOut,
     required this.remainingDebt,
+    required this.totalProfit,
     required this.fmt,
   });
 
   @override
   Widget build(BuildContext context) {
-    Widget buildItem(String title, double amount, Color color, Color bgColor, IconData icon, {bool isOutstanding = false}) {
+    Widget buildItem(
+      String title,
+      double amount,
+      Color color,
+      Color bgColor,
+      IconData icon, {
+      bool isOutstanding = false,
+      bool isProfit = false,
+    }) {
       return Expanded(
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
           decoration: BoxDecoration(
             color: bgColor,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withOpacity(0.15), width: 1),
+            border: Border.all(color: color.withOpacity(0.18), width: 1),
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(icon, size: 11, color: color),
-                  const SizedBox(width: 4),
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 8,
-                      fontWeight: FontWeight.w800,
-                      color: color.withOpacity(0.8),
-                      letterSpacing: 0.3,
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Icon(icon, size: 12, color: color),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        color: color.withOpacity(0.9),
+                        letterSpacing: 0.3,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               FittedBox(
                 fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
                 child: Text(
-                  '₦${fmt.format(amount)}',
+                  isProfit && amount > 0
+                      ? '+₦${fmt.format(amount)}'
+                      : '₦${fmt.format(amount)}',
                   style: TextStyle(
-                    fontSize: isOutstanding ? 14 : 12,
+                    fontSize: isOutstanding ? 15 : 14,
                     fontWeight: FontWeight.w900,
                     color: color,
                   ),
@@ -1260,19 +1300,36 @@ class _FinancialSummaryCard extends StatelessWidget {
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.01),
-            blurRadius: 4,
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
         children: [
-          buildItem('TOTAL SALES', totalIn, const Color(0xFF3B82F6), const Color(0xFFEFF6FF), Icons.add_circle_outline_rounded),
-          const SizedBox(width: 8),
-          buildItem('TOTAL PAID', totalOut, const Color(0xFF10B981), const Color(0xFFECFDF5), Icons.check_circle_outline_rounded),
-          const SizedBox(width: 8),
-          buildItem('BALANCE', remainingDebt, remainingDebt > 0 ? const Color(0xFFEF4444) : const Color(0xFF10B981), remainingDebt > 0 ? const Color(0xFFFEF2F2) : const Color(0xFFECFDF5), Icons.warning_amber_rounded, isOutstanding: true),
+          Row(
+            children: [
+              buildItem('TOTAL SALES', totalIn, const Color(0xFF3B82F6), const Color(0xFFEFF6FF), Icons.receipt_long_rounded),
+              const SizedBox(width: 8),
+              buildItem('TOTAL PROFIT', totalProfit, const Color(0xFF10B981), const Color(0xFFECFDF5), Icons.trending_up_rounded, isProfit: true),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              buildItem('TOTAL PAID', totalOut, const Color(0xFF6366F1), const Color(0xFFEEF2FF), Icons.check_circle_outline_rounded),
+              const SizedBox(width: 8),
+              buildItem(
+                'BALANCE',
+                remainingDebt,
+                remainingDebt > 0 ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                remainingDebt > 0 ? const Color(0xFFFEF2F2) : const Color(0xFFECFDF5),
+                Icons.account_balance_wallet_outlined,
+                isOutstanding: true,
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -2207,6 +2264,63 @@ class _SalesEntrySheetState extends ConsumerState<_SalesEntrySheet> {
                   fillColor: Color(0xFFF1F5F9),
                 ),
                 validator: (v) => v!.trim().isEmpty ? 'Required' : null,
+              ),
+              Builder(
+                builder: (_) {
+                  final products = productsAsync.value ?? [];
+                  final p = CurrencyInputFormatter.parse(_priceCtrl.text);
+                  final q = int.tryParse(_qtyCtrl.text) ?? 0;
+                  if (p <= 0 || q <= 0) return const SizedBox.shrink();
+
+                  Product? matched;
+                  if (_selectedProductId != null) {
+                    matched = products.where((item) => item.id == _selectedProductId).firstOrNull;
+                  } else if (_itemCtrl.text.isNotEmpty) {
+                    matched = products.where((item) => item.name.trim().toLowerCase() == _itemCtrl.text.trim().toLowerCase()).firstOrNull;
+                  }
+
+                  final cost = matched?.costPrice ?? 0.0;
+                  final unitProfit = p - cost;
+                  final estProfit = unitProfit * q;
+
+                  return Container(
+                    margin: const EdgeInsets.only(top: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.25)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Icon(Icons.trending_up_rounded, size: 14, color: Color(0xFF10B981)),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Estimated Profit: +₦${_numFmt.format(estProfit)}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF047857),
+                          ),
+                        ),
+                        if (cost > 0) ...[
+                          const Spacer(),
+                          Text(
+                            'Cost: ₦${_numFmt.format(cost)}/ea',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF059669)),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 18),
 
