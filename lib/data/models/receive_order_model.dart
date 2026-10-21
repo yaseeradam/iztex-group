@@ -29,13 +29,24 @@ class ReceiveOrderItemModel {
         quantity: quantity,
       );
 
-  factory ReceiveOrderItemModel.fromMap(Map<dynamic, dynamic> map) =>
-      ReceiveOrderItemModel(
-        productId: map['productId'] as String,
-        productName: map['productName'] as String,
-        unitPrice: (map['unitPrice'] as num).toDouble(),
-        quantity: map['quantity'] as int,
-      );
+  factory ReceiveOrderItemModel.fromMap(Map<dynamic, dynamic> map) {
+    final rawPrice = map['unitPrice'];
+    final unitPrice = (rawPrice is num)
+        ? rawPrice.toDouble()
+        : double.tryParse(rawPrice?.toString() ?? '') ?? 0.0;
+
+    final rawQty = map['quantity'];
+    final quantity = (rawQty is num)
+        ? rawQty.toInt()
+        : int.tryParse(rawQty?.toString() ?? '') ?? 0;
+
+    return ReceiveOrderItemModel(
+      productId: map['productId']?.toString() ?? '',
+      productName: map['productName']?.toString() ?? '',
+      unitPrice: unitPrice,
+      quantity: quantity,
+    );
+  }
 
   Map<String, dynamic> toMap() => {
         'productId': productId,
@@ -84,20 +95,37 @@ class ReceiveOrderModel {
         isSynced: isSynced,
       );
 
-  factory ReceiveOrderModel.fromMap(Map<dynamic, dynamic> map) =>
-      ReceiveOrderModel(
-        id: map['id']?.toString() ?? '',
-        supplierName: map['supplierName']?.toString() ?? '',
-        items: (map['items'] as List? ?? [])
-            .map((e) => ReceiveOrderItemModel.fromMap(e as Map))
-            .toList(),
-        totalAmount: (map['totalAmount'] as num?)?.toDouble() ?? 0.0,
-        receivedDate: DateTime.tryParse(map['receivedDate']?.toString() ?? '') ??
-            DateTime.tryParse(map['updatedAt']?.toString() ?? '') ??
-            DateTime.now(),
-        note: map['note'] as String?,
-        isSynced: map['isSynced'] as bool? ?? false,
-      );
+  factory ReceiveOrderModel.fromMap(Map<dynamic, dynamic> map) {
+    final rawTotal = map['totalAmount'];
+    final totalAmount = (rawTotal is num)
+        ? rawTotal.toDouble()
+        : double.tryParse(rawTotal?.toString() ?? '') ?? 0.0;
+
+    final rawItems = map['items'];
+    final itemsList = <ReceiveOrderItemModel>[];
+    if (rawItems is List) {
+      for (final e in rawItems) {
+        if (e is Map) {
+          itemsList.add(ReceiveOrderItemModel.fromMap(e));
+        }
+      }
+    }
+
+    final rawSynced = map['isSynced'];
+    final isSynced = rawSynced == true || rawSynced?.toString().toLowerCase() == 'true';
+
+    return ReceiveOrderModel(
+      id: map['id']?.toString() ?? '',
+      supplierName: map['supplierName']?.toString() ?? '',
+      items: itemsList,
+      totalAmount: totalAmount,
+      receivedDate: DateTime.tryParse(map['receivedDate']?.toString() ?? '') ??
+          DateTime.tryParse(map['updatedAt']?.toString() ?? '') ??
+          DateTime.now(),
+      note: map['note']?.toString(),
+      isSynced: isSynced,
+    );
+  }
 
   Map<String, dynamic> toMap() => {
         'id': id,

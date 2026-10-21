@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -22,6 +22,26 @@ import '../models/receive_order_model.dart';
 
 enum SyncStatus { synced, syncing, pending, error }
 
+double? _safeDouble(dynamic v) {
+  if (v == null) return null;
+  if (v is num) return v.toDouble();
+  return double.tryParse(v.toString());
+}
+
+double _safeDoubleDef(dynamic v, [double def = 0.0]) {
+  return _safeDouble(v) ?? def;
+}
+
+int? _safeInt(dynamic v) {
+  if (v == null) return null;
+  if (v is num) return v.toInt();
+  return int.tryParse(v.toString());
+}
+
+int _safeIntDef(dynamic v, [int def = 0]) {
+  return _safeInt(v) ?? def;
+}
+
 class SyncService {
   final ProductLocalDataSource _productDS;
   final CustomerLocalDataSource _customerDS;
@@ -30,8 +50,25 @@ class SyncService {
   final ShopCustomerLocalDataSource _shopCustomerDS;
   final String activeShopId;
 
+  VoidCallback? onSyncCompleted;
+
+  String get effectiveShopId {
+    if (activeShopId.isNotEmpty && activeShopId != 'default') return activeShopId;
+    try {
+      if (Hive.isBoxOpen('auth')) {
+        final box = Hive.box('auth');
+        final id = box.get('active_shop_id', defaultValue: '1')?.toString() ?? '1';
+        if (id.isNotEmpty) return id;
+      }
+    } catch (_) {}
+    return '1';
+  }
+
   SyncStatus _status = SyncStatus.synced;
   SyncStatus get status => _status;
+
+  String? _lastSyncError;
+  String? get lastSyncError => _lastSyncError;
 
   final _statusController = StreamController<SyncStatus>.broadcast();
   Stream<SyncStatus> get statusStream => _statusController.stream;
@@ -76,110 +113,166 @@ class SyncService {
         );
         user = credential.user;
       } catch (e) {
-        try {
-          final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-            email: canonicalEmail,
-            password: canonicalPass,
-          );
-          user = credential.user;
-        } catch (e2) {
-          debugPrint('[SYNC AUTH ERROR] Re-authentication failed: $e2');
+        if (e is FirebaseAuthException && (e.code == 'user-not-found' || e.code == 'invalid-credential')) {
+          try {
+            final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+              email: canonicalEmail,
+              password: canonicalPass,
+            );
+            user = credential.user;
+          } catch (e2) {
+            debugPrint('[SYNC AUTH ERROR] Creation failed: $e2');
+            _lastSyncError = 'Firebase auth failed: $e2';
+          }
+        } else {
+          debugPrint('[SYNC AUTH ERROR] Sign in failed: $e');
+          _lastSyncError = 'Firebase auth failed: $e';
         }
       }
     }
     return user;
   }
 
-  Future<void> syncAll() async {
-    if (_isSyncing) return;
+  Future<bool> syncAll({bool forcePull = false}) async {
+    if (_isSyncing) return false;
     _isSyncing = true;
+    _lastSyncError = null;
     _setStatus(SyncStatus.syncing);
 
     try {
       final user = await _ensureAuth();
       if (user == null) {
+        final authBox = await _getBox('auth');
+        final isLoggedIn = authBox.get('logged_in', defaultValue: false) as bool;
+        if (!isLoggedIn) {
+          // User is not signed in locally yet, so this is idle state, not a failure
+          _setStatus(SyncStatus.synced);
+          return true;
+        }
         debugPrint('[SYNC ERROR] Cannot sync: user is not signed in to Firebase.');
+        _lastSyncError = _lastSyncError ?? 'User is not signed in to cloud';
         _setStatus(SyncStatus.error);
-        return;
+        return false;
       }
 
       final userId = user.uid;
       final db = FirebaseFirestore.instance;
-      debugPrint('[SYNC] Starting sync for user: $userId on shop: $activeShopId');
+      final currentShopId = effectiveShopId;
+      debugPrint('[SYNC] Starting sync for user: $userId on shop: $currentShopId (configured: $activeShopId)');
 
       // ============================================
       // 1. PUSH: LOCAL DATA TO FIRESTORE
       // ============================================
 
       // Push pending deletions first
-      await _pushDeletions(db, userId, 'products_$activeShopId', 'products');
-      await _pushDeletions(db, userId, 'customers_$activeShopId', 'customers');
-      await _pushDeletions(db, userId, 'sales_$activeShopId', 'sales');
-      await _pushDeletions(db, userId, 'debts_$activeShopId', 'debts');
-      await _pushDeletions(db, userId, 'shop_customers_$activeShopId', 'shop_customers');
+      await _pushDeletions(db, userId, 'products_$currentShopId', 'products');
+      await _pushDeletions(db, userId, 'customers_$currentShopId', 'customers');
+      await _pushDeletions(db, userId, 'sales_$currentShopId', 'sales');
+      await _pushDeletions(db, userId, 'debts_$currentShopId', 'debts');
+      await _pushDeletions(db, userId, 'shop_customers_$currentShopId', 'shop_customers');
 
       // Model-based types (push all local data to cloud)
-      final allProducts = await _productDS.getAllProducts();
-      for (final p in allProducts) {
-        final map = p.toMap();
-        map['updatedAt'] = p.updatedAt.toIso8601String();
-        await db.collection('users').doc(userId).collection('products').doc(p.id)
-            .set(map, SetOptions(merge: true));
-        await _productDS.markAsSynced(p.id);
+      try {
+        final allProducts = await _productDS.getAllProducts();
+        for (final p in allProducts) {
+          try {
+            final map = p.toMap();
+            map['updatedAt'] = p.updatedAt.toIso8601String();
+            await db.collection('users').doc(userId).collection('products').doc(p.id)
+                .set(map, SetOptions(merge: true));
+            await _productDS.markAsSynced(p.id);
+          } catch (e) {
+            debugPrint('[SYNC PUSH PRODUCT ERROR] ${p.id}: $e');
+          }
+        }
+      } catch (e) {
+        debugPrint('[SYNC PUSH PRODUCTS] $e');
       }
 
-      final allCustomers = await _customerDS.getAllCustomers();
-      for (final c in allCustomers) {
-        final map = c.toMap();
-        map['updatedAt'] = c.updatedAt.toIso8601String();
-        await db.collection('users').doc(userId).collection('customers').doc(c.id)
-            .set(map, SetOptions(merge: true));
-        await _customerDS.markAsSynced(c.id);
+      try {
+        final allCustomers = await _customerDS.getAllCustomers();
+        for (final c in allCustomers) {
+          try {
+            final map = c.toMap();
+            map['updatedAt'] = c.updatedAt.toIso8601String();
+            await db.collection('users').doc(userId).collection('customers').doc(c.id)
+                .set(map, SetOptions(merge: true));
+            await _customerDS.markAsSynced(c.id);
+          } catch (e) {
+            debugPrint('[SYNC PUSH CUSTOMER ERROR] ${c.id}: $e');
+          }
+        }
+      } catch (e) {
+        debugPrint('[SYNC PUSH CUSTOMERS] $e');
       }
 
-      final allSales = await _saleDS.getAllSales();
-      for (final s in allSales) {
-        final map = s.toMap();
-        map['updatedAt'] = s.saleDate.toIso8601String();
-        await db.collection('users').doc(userId).collection('sales').doc(s.id)
-            .set(map, SetOptions(merge: true));
-        await _saleDS.markAsSynced(s.id);
+      try {
+        final allSales = await _saleDS.getAllSales();
+        for (final s in allSales) {
+          try {
+            final map = s.toMap();
+            map['updatedAt'] = s.saleDate.toIso8601String();
+            await db.collection('users').doc(userId).collection('sales').doc(s.id)
+                .set(map, SetOptions(merge: true));
+            await _saleDS.markAsSynced(s.id);
+          } catch (e) {
+            debugPrint('[SYNC PUSH SALE ERROR] ${s.id}: $e');
+          }
+        }
+      } catch (e) {
+        debugPrint('[SYNC PUSH SALES] $e');
       }
 
-      final allDebts = await _debtDS.getAllDebts();
-      for (final d in allDebts) {
-        final map = d.toMap();
-        map['updatedAt'] = d.updatedAt.toIso8601String();
-        await db.collection('users').doc(userId).collection('debts').doc(d.id)
-            .set(map, SetOptions(merge: true));
-        await _debtDS.markAsSynced(d.id);
+      try {
+        final allDebts = await _debtDS.getAllDebts();
+        for (final d in allDebts) {
+          try {
+            final map = d.toMap();
+            map['updatedAt'] = d.updatedAt.toIso8601String();
+            await db.collection('users').doc(userId).collection('debts').doc(d.id)
+                .set(map, SetOptions(merge: true));
+            await _debtDS.markAsSynced(d.id);
+          } catch (e) {
+            debugPrint('[SYNC PUSH DEBT ERROR] ${d.id}: $e');
+          }
+        }
+      } catch (e) {
+        debugPrint('[SYNC PUSH DEBTS] $e');
       }
 
-      final allShopCustomers = await _shopCustomerDS.getAllCustomers();
-      for (final c in allShopCustomers) {
-        final map = c.toMap();
-        map['updatedAt'] = c.updatedAt.toIso8601String();
-        await db.collection('users').doc(userId).collection('shop_customers').doc(c.id)
-            .set(map, SetOptions(merge: true));
-        await _shopCustomerDS.markAsSynced(c.id);
+      try {
+        final allShopCustomers = await _shopCustomerDS.getAllCustomers();
+        for (final c in allShopCustomers) {
+          try {
+            final map = c.toMap();
+            map['updatedAt'] = c.updatedAt.toIso8601String();
+            await db.collection('users').doc(userId).collection('shop_customers').doc(c.id)
+                .set(map, SetOptions(merge: true));
+            await _shopCustomerDS.markAsSynced(c.id);
+          } catch (e) {
+            debugPrint('[SYNC PUSH SHOP CUSTOMER ERROR] ${c.id}: $e');
+          }
+        }
+      } catch (e) {
+        debugPrint('[SYNC PUSH SHOP CUSTOMERS] $e');
       }
 
       // Hive-native types via PendingSyncTracker & full local sync
-      await _pushHiveNative<LedgerEntry>(db, userId, 'ledger_entries_$activeShopId', 'ledger_entries', (e) => {
+      await _pushHiveNative<LedgerEntry>(db, userId, 'ledger_entries_$currentShopId', 'ledger_entries', (e) => {
         'id': e.id, 'customerId': e.customerId, 'date': e.date.toIso8601String(),
         'inItem': e.inItem, 'outItem': e.outItem, 'price': e.price, 'quantity': e.quantity,
         'totalAmount': e.totalAmount, 'runningBalance': e.runningBalance, 'typeIndex': e.typeIndex,
         'updatedAt': DateTime.now().toIso8601String(),
       });
 
-      await _pushHiveNative<LedgerEntry>(db, userId, 'shop_ledger_entries_$activeShopId', 'shop_ledger_entries', (e) => {
+      await _pushHiveNative<LedgerEntry>(db, userId, 'shop_ledger_entries_$currentShopId', 'shop_ledger_entries', (e) => {
         'id': e.id, 'customerId': e.customerId, 'date': e.date.toIso8601String(),
         'inItem': e.inItem, 'outItem': e.outItem, 'price': e.price, 'quantity': e.quantity,
         'totalAmount': e.totalAmount, 'runningBalance': e.runningBalance, 'typeIndex': e.typeIndex,
         'updatedAt': DateTime.now().toIso8601String(),
       });
 
-      await _pushHiveNative<ReceiveEntry>(db, userId, 'receive_entries_$activeShopId', 'receive_entries', (e) => {
+      await _pushHiveNative<ReceiveEntry>(db, userId, 'receive_entries_$currentShopId', 'receive_entries', (e) => {
         'id': e.id, 'date': e.date.toIso8601String(), 'productName': e.productName,
         'companyName': e.companyName, 'price': e.price, 'quantity': e.quantity,
         'totalAmount': e.totalAmount, 'payment': e.payment,
@@ -187,7 +280,7 @@ class SyncService {
         'updatedAt': DateTime.now().toIso8601String(),
       });
 
-      await _pushHiveNative<SalesLedgerEntry>(db, userId, 'sales_ledger_$activeShopId', 'sales_ledger', (e) => {
+      await _pushHiveNative<SalesLedgerEntry>(db, userId, 'sales_ledger_$currentShopId', 'sales_ledger', (e) => {
         'id': e.id, 'date': e.date.toIso8601String(), 'inItem': e.inItem, 'outItem': e.outItem,
         'price': e.price, 'quantity': e.quantity, 'totalAmount': e.totalAmount,
         'runningBalance': e.runningBalance, 'typeIndex': e.typeIndex, 'personName': e.personName,
@@ -196,8 +289,8 @@ class SyncService {
       });
 
       // Map types via PendingSyncTracker & full local sync
-      await _pushMap(db, userId, 'customer_ledger_$activeShopId', 'customer_ledger');
-      await _pushMap(db, userId, 'receive_orders_$activeShopId', 'receive_orders');
+      await _pushMap(db, userId, 'customer_ledger_$currentShopId', 'customer_ledger');
+      await _pushMap(db, userId, 'receive_orders_$currentShopId', 'receive_orders');
 
       // Sync shop profile metadata to Firestore
       try {
@@ -217,105 +310,139 @@ class SyncService {
       // ============================================
       // 2. PULL: ALL CLOUD DATA BACK TO LOCAL HIVE
       // ============================================
-      await _pullData<ProductModel>(
-        db: db, userId: userId, collection: 'products', boxName: 'products_$activeShopId',
-        fromMap: (map) => ProductModel.fromMap(map),
-        getUpdatedAt: (item) => item.updatedAt,
-      );
-
-      await _pullData<CustomerModel>(
-        db: db, userId: userId, collection: 'customers', boxName: 'customers_$activeShopId',
-        fromMap: (map) => CustomerModel.fromMap(map),
-        getUpdatedAt: (item) => item.updatedAt,
-      );
-
-      await _pullData<SaleModel>(
-        db: db, userId: userId, collection: 'sales', boxName: 'sales_$activeShopId',
-        fromMap: (map) => SaleModel.fromMap(map),
-        getUpdatedAt: (item) => item.saleDate,
-      );
-
-      await _pullData<DebtModel>(
-        db: db, userId: userId, collection: 'debts', boxName: 'debts_$activeShopId',
-        fromMap: (map) => DebtModel.fromMap(map),
-        getUpdatedAt: (item) => item.updatedAt,
-      );
-
-      await _pullData<CustomerModel>(
-        db: db, userId: userId, collection: 'shop_customers', boxName: 'shop_customers_$activeShopId',
-        fromMap: (map) => CustomerModel.fromMap(map),
-        getUpdatedAt: (item) => item.updatedAt,
-      );
-
-      await _pullHiveNative<LedgerEntry>(db, userId, 'ledger_entries', 'ledger_entries_$activeShopId', (map) {
-        return LedgerEntry(
-          id: map['id']?.toString() ?? '',
-          customerId: map['customerId']?.toString() ?? '',
-          date: DateTime.tryParse(map['date']?.toString() ?? '') ?? DateTime.now(),
-          inItem: map['inItem'] as String?,
-          outItem: map['outItem'] as String?,
-          price: (map['price'] as num?)?.toDouble(),
-          quantity: (map['quantity'] as num?)?.toInt(),
-          totalAmount: (map['totalAmount'] as num?)?.toDouble() ?? 0.0,
-          runningBalance: (map['runningBalance'] as num?)?.toDouble() ?? 0.0,
-          typeIndex: (map['typeIndex'] as num?)?.toInt() ?? 1,
+      final targetShopIds = {currentShopId, '1', ''};
+      for (final sId in targetShopIds) {
+        await _pullData<ProductModel>(
+          db: db, userId: userId, collection: 'products', boxName: 'products_$sId',
+          fromMap: (map) => ProductModel.fromMap(map),
+          getUpdatedAt: (item) => item.updatedAt,
+          force: forcePull,
         );
-      });
 
-      await _pullHiveNative<LedgerEntry>(db, userId, 'shop_ledger_entries', 'shop_ledger_entries_$activeShopId', (map) {
-        return LedgerEntry(
-          id: map['id']?.toString() ?? '',
-          customerId: map['customerId']?.toString() ?? '',
-          date: DateTime.tryParse(map['date']?.toString() ?? '') ?? DateTime.now(),
-          inItem: map['inItem'] as String?,
-          outItem: map['outItem'] as String?,
-          price: (map['price'] as num?)?.toDouble(),
-          quantity: (map['quantity'] as num?)?.toInt(),
-          totalAmount: (map['totalAmount'] as num?)?.toDouble() ?? 0.0,
-          runningBalance: (map['runningBalance'] as num?)?.toDouble() ?? 0.0,
-          typeIndex: (map['typeIndex'] as num?)?.toInt() ?? 1,
+        await _pullData<CustomerModel>(
+          db: db, userId: userId, collection: 'customers', boxName: 'customers_$sId',
+          fromMap: (map) => CustomerModel.fromMap(map),
+          getUpdatedAt: (item) => item.updatedAt,
+          force: forcePull,
         );
-      });
 
-      await _pullHiveNative<ReceiveEntry>(db, userId, 'receive_entries', 'receive_entries_$activeShopId', (map) {
-        return ReceiveEntry(
-          id: map['id']?.toString() ?? '',
-          date: DateTime.tryParse(map['date']?.toString() ?? '') ?? DateTime.now(),
-          productName: map['productName'] as String? ?? '',
-          companyName: map['companyName'] as String? ?? '',
-          price: (map['price'] as num?)?.toDouble() ?? 0.0,
-          quantity: (map['quantity'] as num?)?.toInt() ?? 0,
-          totalAmount: (map['totalAmount'] as num?)?.toDouble() ?? 0.0,
-          payment: (map['payment'] as num?)?.toDouble(),
-          paymentDate: map['paymentDate'] != null ? DateTime.tryParse(map['paymentDate'].toString()) : null,
-          description: map['description'] as String?,
+        await _pullData<SaleModel>(
+          db: db, userId: userId, collection: 'sales', boxName: 'sales_$sId',
+          fromMap: (map) => SaleModel.fromMap(map),
+          getUpdatedAt: (item) => item.saleDate,
+          force: forcePull,
         );
-      });
 
-      await _pullHiveNative<SalesLedgerEntry>(db, userId, 'sales_ledger', 'sales_ledger_$activeShopId', (map) {
-        return SalesLedgerEntry(
-          id: map['id']?.toString() ?? '',
-          date: DateTime.tryParse(map['date']?.toString() ?? '') ?? DateTime.now(),
-          inItem: map['inItem'] as String?,
-          outItem: map['outItem'] as String?,
-          price: (map['price'] as num?)?.toDouble(),
-          quantity: (map['quantity'] as num?)?.toInt(),
-          totalAmount: (map['totalAmount'] as num?)?.toDouble() ?? 0.0,
-          runningBalance: (map['runningBalance'] as num?)?.toDouble() ?? 0.0,
-          typeIndex: (map['typeIndex'] as num?)?.toInt() ?? 1,
-          personName: map['personName'] as String?,
-          payment: (map['payment'] as num?)?.toDouble() ?? 0.0,
-          paymentDate: map['paymentDate'] != null ? DateTime.tryParse(map['paymentDate'].toString()) : null,
+        await _pullData<DebtModel>(
+          db: db, userId: userId, collection: 'debts', boxName: 'debts_$sId',
+          fromMap: (map) => DebtModel.fromMap(map),
+          getUpdatedAt: (item) => item.updatedAt,
+          force: forcePull,
         );
-      });
 
-      await _pullMapType(db, userId, 'customer_ledger', 'customer_ledger_$activeShopId', (map) {
-        return CustomerLedgerEntryModel.fromMap(map).toMap();
-      });
+        await _pullData<CustomerModel>(
+          db: db, userId: userId, collection: 'shop_customers', boxName: 'shop_customers_$sId',
+          fromMap: (map) => CustomerModel.fromMap(map),
+          getUpdatedAt: (item) => item.updatedAt,
+          force: forcePull,
+        );
 
-      await _pullMapType(db, userId, 'receive_orders', 'receive_orders_$activeShopId', (map) {
-        return ReceiveOrderModel.fromMap(map).toMap();
-      });
+        await _pullHiveNative<LedgerEntry>(db, userId, 'ledger_entries', 'ledger_entries_$sId', (map) {
+          return LedgerEntry(
+            id: map['id']?.toString() ?? '',
+            customerId: map['customerId']?.toString() ?? '',
+            date: DateTime.tryParse(map['date']?.toString() ?? '') ?? DateTime.now(),
+            inItem: map['inItem']?.toString(),
+            outItem: map['outItem']?.toString(),
+            price: _safeDouble(map['price']),
+            quantity: _safeInt(map['quantity']),
+            totalAmount: _safeDoubleDef(map['totalAmount']),
+            runningBalance: _safeDoubleDef(map['runningBalance']),
+            typeIndex: _safeIntDef(map['typeIndex'], 1),
+          );
+        }, force: forcePull);
+
+        await _pullHiveNative<LedgerEntry>(db, userId, 'shop_ledger_entries', 'shop_ledger_entries_$sId', (map) {
+          return LedgerEntry(
+            id: map['id']?.toString() ?? '',
+            customerId: map['customerId']?.toString() ?? '',
+            date: DateTime.tryParse(map['date']?.toString() ?? '') ?? DateTime.now(),
+            inItem: map['inItem']?.toString(),
+            outItem: map['outItem']?.toString(),
+            price: _safeDouble(map['price']),
+            quantity: _safeInt(map['quantity']),
+            totalAmount: _safeDoubleDef(map['totalAmount']),
+            runningBalance: _safeDoubleDef(map['runningBalance']),
+            typeIndex: _safeIntDef(map['typeIndex'], 1),
+          );
+        }, force: forcePull);
+
+        await _pullHiveNative<ReceiveEntry>(db, userId, 'receive_entries', 'receive_entries_$sId', (map) {
+          return ReceiveEntry(
+            id: map['id']?.toString() ?? '',
+            date: DateTime.tryParse(map['date']?.toString() ?? '') ?? DateTime.now(),
+            productName: map['productName']?.toString() ?? '',
+            companyName: map['companyName']?.toString() ?? '',
+            price: _safeDoubleDef(map['price']),
+            quantity: _safeIntDef(map['quantity']),
+            totalAmount: _safeDoubleDef(map['totalAmount']),
+            payment: _safeDouble(map['payment']),
+            paymentDate: map['paymentDate'] != null ? DateTime.tryParse(map['paymentDate'].toString()) : null,
+            description: map['description']?.toString(),
+          );
+        }, force: forcePull);
+
+        await _pullHiveNative<SalesLedgerEntry>(db, userId, 'sales_ledger', 'sales_ledger_$sId', (map) {
+          return SalesLedgerEntry(
+            id: map['id']?.toString() ?? '',
+            date: DateTime.tryParse(map['date']?.toString() ?? '') ?? DateTime.now(),
+            inItem: map['inItem']?.toString(),
+            outItem: map['outItem']?.toString(),
+            price: _safeDouble(map['price']),
+            quantity: _safeInt(map['quantity']),
+            totalAmount: _safeDoubleDef(map['totalAmount']),
+            runningBalance: _safeDoubleDef(map['runningBalance']),
+            typeIndex: _safeIntDef(map['typeIndex'], 1),
+            personName: map['personName']?.toString(),
+            payment: _safeDoubleDef(map['payment']),
+            paymentDate: map['paymentDate'] != null ? DateTime.tryParse(map['paymentDate'].toString()) : null,
+          );
+        }, force: forcePull);
+
+        // Cross-populate customer_ledger from Firestore ledger_entries
+        await _pullMapType(db, userId, 'ledger_entries', 'customer_ledger_$sId', (map) {
+          final inItem = map['inItem']?.toString();
+          final outItem = map['outItem']?.toString();
+          final price = map['price']?.toString();
+          final qty = _safeInt(map['quantity']);
+          final total = _safeDoubleDef(map['totalAmount']);
+          final balance = _safeDoubleDef(map['runningBalance']);
+          final d = DateTime.tryParse(map['date']?.toString() ?? '') ?? DateTime.now();
+          final u = DateTime.tryParse(map['updatedAt']?.toString() ?? '') ?? d;
+          return {
+            'id': map['id']?.toString() ?? '',
+            'customerId': map['customerId']?.toString() ?? '',
+            'date': d.toIso8601String(),
+            'inDescription': inItem,
+            'outDescription': outItem,
+            'price': price,
+            'quantity': qty,
+            'totalAmount': total,
+            'totalBalance': balance,
+            'updatedAt': u.toIso8601String(),
+            'isSynced': true,
+          };
+        }, force: forcePull);
+
+        // Also pull any dedicated customer_ledger entries if present
+        await _pullMapType(db, userId, 'customer_ledger', 'customer_ledger_$sId', (map) {
+          return CustomerLedgerEntryModel.fromMap(map).toMap();
+        }, force: forcePull);
+
+        await _pullMapType(db, userId, 'receive_orders', 'receive_orders_$sId', (map) {
+          return ReceiveOrderModel.fromMap(map).toMap();
+        }, force: forcePull);
+      }
 
       // Pull shop profile metadata
       try {
@@ -337,9 +464,17 @@ class SyncService {
 
       debugPrint('[SYNC] All data synchronized successfully.');
       _setStatus(SyncStatus.synced);
+      try {
+        onSyncCompleted?.call();
+      } catch (err) {
+        debugPrint('[SYNC] onSyncCompleted error: $err');
+      }
+      return true;
     } catch (e, stack) {
       debugPrint('[SYNC FATAL ERROR] $e\n$stack');
+      _lastSyncError = e.toString();
       _setStatus(SyncStatus.error);
+      return false;
     } finally {
       _isSyncing = false;
     }
@@ -455,6 +590,7 @@ class SyncService {
     required String boxName,
     required T Function(Map<String, dynamic>) fromMap,
     required DateTime Function(T) getUpdatedAt,
+    bool force = false,
   }) async {
     final box = await _getBox<T>(boxName);
     final snapshot = await db.collection('users').doc(userId).collection(collection).get();
@@ -464,30 +600,13 @@ class SyncService {
       if (PendingSyncTracker.isPendingDelete(boxName, id)) continue;
 
       try {
-        final remoteData = doc.data();
-        DateTime? remoteUpdatedAt;
-        if (remoteData.containsKey('updatedAt') && remoteData['updatedAt'] != null) {
-          remoteUpdatedAt = DateTime.tryParse(remoteData['updatedAt'].toString());
-        } else if (remoteData.containsKey('saleDate') && remoteData['saleDate'] != null) {
-          remoteUpdatedAt = DateTime.tryParse(remoteData['saleDate'].toString());
-        } else if (remoteData.containsKey('receivedDate') && remoteData['receivedDate'] != null) {
-          remoteUpdatedAt = DateTime.tryParse(remoteData['receivedDate'].toString());
-        } else if (remoteData.containsKey('date') && remoteData['date'] != null) {
-          remoteUpdatedAt = DateTime.tryParse(remoteData['date'].toString());
-        }
+        final remoteData = Map<String, dynamic>.from(doc.data());
+        remoteData['id'] = remoteData['id']?.toString() ?? id;
 
-        final localItem = box.get(id);
-        if (localItem == null) {
-          // Record doesn't exist locally: ALWAYS insert!
+        final isPending = PendingSyncTracker.getPendingIds(boxName).contains(id);
+        if (force || box.get(id) == null || !isPending) {
           final item = fromMap(remoteData);
           await box.put(id, item);
-        } else {
-          final localUpdatedAt = getUpdatedAt(localItem);
-          if (remoteUpdatedAt != null) {
-            if (remoteUpdatedAt.isAfter(localUpdatedAt)) {
-              await box.put(id, fromMap(remoteData));
-            }
-          }
         }
       } catch (err, st) {
         debugPrint('[SYNC PULL ERROR] Failed pulling $collection doc $id: $err\n$st');
@@ -500,8 +619,9 @@ class SyncService {
     String userId,
     String collection,
     String boxName,
-    T Function(Map<String, dynamic>) fromMap,
-  ) async {
+    T Function(Map<String, dynamic>) fromMap, {
+    bool force = false,
+  }) async {
     final box = await _getBox<T>(boxName);
     final snapshot = await db.collection('users').doc(userId).collection(collection).get();
 
@@ -510,10 +630,12 @@ class SyncService {
       if (PendingSyncTracker.isPendingDelete(boxName, id)) continue;
 
       try {
-        final remoteData = doc.data();
+        final remoteData = Map<String, dynamic>.from(doc.data());
+        remoteData['id'] = remoteData['id']?.toString() ?? id;
+
         final isPending = PendingSyncTracker.getPendingIds(boxName).contains(id);
 
-        if (box.get(id) == null || !isPending) {
+        if (force || box.get(id) == null || !isPending) {
           await box.put(id, fromMap(remoteData));
         }
       } catch (err, st) {
@@ -527,8 +649,9 @@ class SyncService {
     String userId,
     String collection,
     String boxName,
-    Map<String, dynamic> Function(Map<String, dynamic>) fromMap,
-  ) async {
+    Map<String, dynamic> Function(Map<String, dynamic>) fromMap, {
+    bool force = false,
+  }) async {
     final box = await _getBox(boxName);
     final snapshot = await db.collection('users').doc(userId).collection(collection).get();
 
@@ -537,34 +660,11 @@ class SyncService {
       if (PendingSyncTracker.isPendingDelete(boxName, id)) continue;
 
       try {
-        final remoteData = doc.data();
-        DateTime? remoteUpdatedAt;
-        if (remoteData.containsKey('updatedAt') && remoteData['updatedAt'] != null) {
-          remoteUpdatedAt = DateTime.tryParse(remoteData['updatedAt'].toString());
-        } else if (remoteData.containsKey('receivedDate') && remoteData['receivedDate'] != null) {
-          remoteUpdatedAt = DateTime.tryParse(remoteData['receivedDate'].toString());
-        } else if (remoteData.containsKey('date') && remoteData['date'] != null) {
-          remoteUpdatedAt = DateTime.tryParse(remoteData['date'].toString());
-        }
-
-        final localItemMap = box.get(id);
-        if (localItemMap == null) {
+        final remoteData = Map<String, dynamic>.from(doc.data());
+        remoteData['id'] = remoteData['id']?.toString() ?? id;
+        final isPending = PendingSyncTracker.getPendingIds(boxName).contains(id);
+        if (force || box.get(id) == null || !isPending) {
           await box.put(id, fromMap(remoteData));
-        } else {
-          final localData = Map<String, dynamic>.from(localItemMap as Map);
-          final localUpdatedAtStr = localData['updatedAt'] ?? localData['receivedDate'] ?? localData['date'];
-          DateTime? localUpdatedAt;
-          if (localUpdatedAtStr != null) {
-            localUpdatedAt = DateTime.tryParse(localUpdatedAtStr.toString());
-          }
-
-          if (remoteUpdatedAt != null && localUpdatedAt != null) {
-            if (remoteUpdatedAt.isAfter(localUpdatedAt)) {
-              await box.put(id, fromMap(remoteData));
-            }
-          } else {
-            await box.put(id, fromMap(remoteData));
-          }
         }
       } catch (err, st) {
         debugPrint('[SYNC PULL MAP ERROR] Failed pulling map $collection doc $id: $err\n$st');

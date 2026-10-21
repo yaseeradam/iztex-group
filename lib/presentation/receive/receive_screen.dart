@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -9,7 +8,6 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:path_provider/path_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/pdf_theme.dart';
@@ -358,14 +356,6 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _HeaderCard(
-                      shopName: authState.shopName,
-                      cardBg: cardBg,
-                      borderColor: borderColor,
-                      textPrimary: textPrimary,
-                      textMuted: textMuted,
-                    ),
-                    const SizedBox(height: 16),
                     _FinancialSummaryCard(
                       totalSpent: totalSpent,
                       totalQty: totalQty,
@@ -874,11 +864,12 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
       final image = await boundary.toImage(pixelRatio: 3.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) return;
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/stock_in_${entry.id.substring(0, 6)}.png');
-      await file.writeAsBytes(byteData.buffer.asUint8List());
       if (!mounted) return;
-      await FileSaver.saveImage(context, file);
+      await FileSaver.saveImageBytes(
+        context,
+        byteData.buffer.asUint8List(),
+        'stock_in_${entry.id.substring(0, 6)}.png',
+      );
     } finally {
       overlay.remove();
     }
@@ -1259,11 +1250,12 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
       final image = await boundary.toImage(pixelRatio: 2.5);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) return;
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/received_stock.png');
-      await file.writeAsBytes(byteData.buffer.asUint8List());
       if (!mounted) return;
-      await FileSaver.saveImage(context, file);
+      await FileSaver.saveImageBytes(
+        context,
+        byteData.buffer.asUint8List(),
+        'received_stock.png',
+      );
     } catch (e) {
       debugPrint('Image export error: $e');
     } finally {

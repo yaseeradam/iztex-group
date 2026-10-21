@@ -74,18 +74,33 @@ class DebtModel extends HiveObject {
         isSynced: isSynced,
       );
 
-  factory DebtModel.fromMap(Map<String, dynamic> map) => DebtModel(
-        id: map['id'] as String,
-        customerId: map['customerId'] as String,
-        customerName: map['customerName'] as String,
-        amount: (map['amount'] as num).toDouble(),
-        paidAmount: (map['paidAmount'] as num? ?? 0).toDouble(),
-        dueDate: DateTime.parse(map['dueDate'] as String),
-        note: map['note'] as String?,
-        isPaid: map['isPaid'] as bool? ?? false,
-        updatedAt: DateTime.parse(map['updatedAt'] as String),
-        isSynced: true,
-      );
+  factory DebtModel.fromMap(Map<String, dynamic> map) {
+    final rawAmount = map['amount'];
+    final amount = (rawAmount is num)
+        ? rawAmount.toDouble()
+        : double.tryParse(rawAmount?.toString() ?? '') ?? 0.0;
+
+    final rawPaidAmount = map['paidAmount'];
+    final paidAmount = (rawPaidAmount is num)
+        ? rawPaidAmount.toDouble()
+        : double.tryParse(rawPaidAmount?.toString() ?? '') ?? 0.0;
+
+    final rawIsPaid = map['isPaid'];
+    final isPaid = rawIsPaid == true || rawIsPaid?.toString().toLowerCase() == 'true';
+
+    return DebtModel(
+      id: map['id']?.toString() ?? '',
+      customerId: map['customerId']?.toString() ?? '',
+      customerName: map['customerName']?.toString() ?? '',
+      amount: amount,
+      paidAmount: paidAmount,
+      dueDate: DateTime.tryParse(map['dueDate']?.toString() ?? '') ?? DateTime.now(),
+      note: map['note']?.toString(),
+      isPaid: isPaid,
+      updatedAt: DateTime.tryParse(map['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+      isSynced: true,
+    );
+  }
 
   Map<String, dynamic> toMap() => {
         'id': id,

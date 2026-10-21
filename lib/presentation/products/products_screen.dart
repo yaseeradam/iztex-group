@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../core/theme/app_theme.dart';
@@ -638,15 +638,17 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                               ? LinearGradient(colors: style.colors)
                               : null,
                           shape: BoxShape.circle,
-                          image: currentEntry.imagePath != null
+                          image: (currentEntry.imagePath != null && (!kIsWeb || currentEntry.imagePath!.startsWith('http') || currentEntry.imagePath!.startsWith('blob')))
                               ? DecorationImage(
-                                  image: FileImage(File(currentEntry.imagePath!)),
+                                  image: kIsWeb
+                                      ? NetworkImage(currentEntry.imagePath!) as ImageProvider
+                                      : FileImage(File(currentEntry.imagePath!)),
                                   fit: BoxFit.cover,
                                 )
                               : null,
                         ),
                         alignment: Alignment.center,
-                        child: currentEntry.imagePath == null
+                        child: (currentEntry.imagePath == null || (kIsWeb && !currentEntry.imagePath!.startsWith('http') && !currentEntry.imagePath!.startsWith('blob')))
                             ? Text(
                                 currentEntry.name.isNotEmpty ? currentEntry.name[0].toUpperCase() : '?',
                                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
@@ -1086,11 +1088,12 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       final image = await boundary.toImage(pixelRatio: 3.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) return;
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/product_spec_${product.id.substring(0, 6)}.png');
-      await file.writeAsBytes(byteData.buffer.asUint8List());
       if (!mounted) return;
-      await FileSaver.saveImage(context, file);
+      await FileSaver.saveImageBytes(
+        context,
+        byteData.buffer.asUint8List(),
+        'product_spec_${product.id.substring(0, 6)}.png',
+      );
     } finally {
       overlay.remove();
     }
@@ -1261,11 +1264,12 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       final image = await boundary.toImage(pixelRatio: 2.5);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) return;
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/products_catalog.png');
-      await file.writeAsBytes(byteData.buffer.asUint8List());
       if (!mounted) return;
-      await FileSaver.saveImage(context, file);
+      await FileSaver.saveImageBytes(
+        context,
+        byteData.buffer.asUint8List(),
+        'products_catalog.png',
+      );
     } catch (e) {
       debugPrint('Image export error: $e');
     } finally {
@@ -1628,11 +1632,16 @@ class _ProductCard extends StatelessWidget {
                       )
                     : null,
                 border: Border.all(color: accentColor.withOpacity(0.35), width: 2),
-                image: product.imagePath != null
-                    ? DecorationImage(image: FileImage(File(product.imagePath!)), fit: BoxFit.cover)
+                image: (product.imagePath != null && (!kIsWeb || product.imagePath!.startsWith('http') || product.imagePath!.startsWith('blob')))
+                    ? DecorationImage(
+                        image: kIsWeb
+                            ? NetworkImage(product.imagePath!) as ImageProvider
+                            : FileImage(File(product.imagePath!)),
+                        fit: BoxFit.cover,
+                      )
                     : null,
               ),
-              child: product.imagePath == null
+              child: (product.imagePath == null || (kIsWeb && !product.imagePath!.startsWith('http') && !product.imagePath!.startsWith('blob')))
                   ? Center(
                       child: Text(
                         initial,

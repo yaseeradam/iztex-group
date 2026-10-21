@@ -7,7 +7,8 @@ class SaleLocalDataSource {
 
   Future<Box<SaleModel>> get _box async {
     final authBox = Hive.box('auth');
-    final shopId = authBox.get('active_shop_id', defaultValue: '1') as String;
+    final rawShopId = authBox.get('active_shop_id', defaultValue: '1')?.toString() ?? '1';
+    final shopId = (rawShopId.isEmpty || rawShopId == 'default') ? '1' : rawShopId;
     return Hive.openBox<SaleModel>('${_boxName}_$shopId');
   }
 

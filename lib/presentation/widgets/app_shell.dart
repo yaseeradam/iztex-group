@@ -15,14 +15,14 @@ import 'package:flutter/foundation.dart';
 import '../../core/services/pwa_installer.dart';
 import 'pwa_install_modal.dart';
 
-class _TabNotifier extends Notifier<int> {
+class TabNotifier extends Notifier<int> {
   @override
   int build() => 0;
 
   void setTab(int i) => state = i;
 }
 
-final _currentTabProvider = NotifierProvider<_TabNotifier, int>(_TabNotifier.new);
+final currentTabProvider = NotifierProvider<TabNotifier, int>(TabNotifier.new);
 
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
@@ -56,7 +56,7 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final currentTab = ref.watch(_currentTabProvider);
+    final currentTab = ref.watch(currentTabProvider);
 
     return Scaffold(
       body: AnimatedSwitcher(
@@ -83,7 +83,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       ),
       bottomNavigationBar: _ModernBottomNav(
         currentIndex: currentTab,
-        onTap: (i) => ref.read(_currentTabProvider.notifier).setTab(i),
+        onTap: (i) => ref.read(currentTabProvider.notifier).setTab(i),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );

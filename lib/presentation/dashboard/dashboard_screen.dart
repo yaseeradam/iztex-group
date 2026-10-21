@@ -10,6 +10,10 @@ import 'debt_provider.dart';
 import '../widgets/glass_container.dart';
 import '../widgets/quick_add_customer_sheet.dart';
 import '../widgets/add_debt_sheet.dart';
+import '../widgets/app_feedback.dart';
+import '../../domain/entities/sale.dart';
+import '../widgets/app_shell.dart' show currentTabProvider;
+import '../sales_ledger/sales_ledger_screen.dart' show salesLedgerEntriesProvider, SalesLedgerEntry;
 import 'package:intl/intl.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -41,8 +45,28 @@ class DashboardScreen extends ConsumerWidget {
                 authState: authState,
                 isSyncing: isSyncing,
                 syncStatus: syncStatus.value,
-                onSyncTap: isSyncing ? null : () => ref.read(syncServiceProvider).syncAll(),
-                todayRevenue: todayRevenue.value ?? 0,
+                onSyncTap: isSyncing
+                    ? null
+                    : () async {
+                        final success = await ref.read(syncServiceProvider).syncAll();
+                        if (context.mounted) {
+                          if (success) {
+                            AppFeedback.showSuccess(
+                              context,
+                              'Sync Successful',
+                              'All data synchronized with cloud database.',
+                            );
+                          } else {
+                            final err = ref.read(syncServiceProvider).lastSyncError ?? 'Unknown error';
+                            AppFeedback.showError(
+                              context,
+                              'Sync Failed',
+                              err,
+                            );
+                          }
+                        }
+                      },
+                todayRevenue: todayRevenue,
                 todayProfit: todayProfit,
                 currency: currency,
               ),
@@ -427,6 +451,22 @@ class _ActionTile extends StatelessWidget {
 
 // ── Recent Activity ──────────────────────────────────────────────────────────
 
+class _UnifiedRecentSale {
+  final String id;
+  final String customerName;
+  final String subtitle;
+  final double totalAmount;
+  final DateTime date;
+
+  const _UnifiedRecentSale({
+    required this.id,
+    required this.customerName,
+    required this.subtitle,
+    required this.totalAmount,
+    required this.date,
+  });
+}
+
 class _RecentActivity extends ConsumerWidget {
   final WidgetRef ref;
   const _RecentActivity({required this.ref});
@@ -436,6 +476,7 @@ class _RecentActivity extends ConsumerWidget {
     const textPrimary = Color(0xFF0F172A);
     const textMuted = Color(0xFF64748B);
     final salesAsync = ref.watch(salesProvider);
+    final ledgerAsync = ref.watch(salesLedgerEntriesProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -443,69 +484,122 @@ class _RecentActivity extends ConsumerWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Recent Sales', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: textPrimary)),
+            const Text('Recent Sales', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: textPrimary)),
             TextButton(
-              onPressed: () {},
+              onPressed: () {
+                ref.read(currentTabProvider.notifier).setTab(1);
+              },
               child: const Text('View All', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.primaryColor)),
             ),
           ],
         ),
         const SizedBox(height: 10),
-        salesAsync.when(
-          loading: () => const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator())),
-          error: (e, _) => Text('Error: $e', style: const TextStyle(color: AppTheme.errorColor)),
-          data: (sales) {
-            if (sales.isEmpty) {
-              return ModernCard(
-                padding: const EdgeInsets.all(28),
-                child: Column(children: [
-                  Icon(Icons.receipt_long_rounded, size: 44, color: textMuted.withOpacity(0.4)),
-                  const SizedBox(height: 10),
-                  Text('No sales yet. Start selling!', style: TextStyle(color: textMuted, fontSize: 14)),
-                ]),
-              );
-            }
-            final recent = sales.reversed.take(5).toList();
-            return ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: recent.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (_, i) {
-                final sale = recent[i];
-                final fmt = NumberFormat('#,##0', 'en_US');
-                final timeFmt = DateFormat('h:mm a').format(sale.saleDate);
-                return ModernCard(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  child: Row(children: [
-                    Container(
-                      width: 42, height: 42,
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.receipt_long_rounded, color: AppTheme.primaryColor, size: 18),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(sale.customerName ?? 'Walk-in Customer',
-                            style: TextStyle(fontWeight: FontWeight.w600, color: textPrimary, fontSize: 14)),
-                        const SizedBox(height: 2),
-                        Text('${sale.items.length} item(s) • $timeFmt',
-                            style: TextStyle(color: textMuted, fontSize: 12)),
-                      ],
-                    )),
-                    Text('₦${fmt.format(sale.totalAmount)}',
-                        style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.successColor, fontSize: 15)),
-                  ]),
-                );
-              },
-            );
-          },
-        ),
+        if (salesAsync.isLoading && ledgerAsync.isLoading)
+          const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
+        else if (salesAsync.hasError && ledgerAsync.hasError)
+          Text('Error: ${salesAsync.error ?? ledgerAsync.error}', style: const TextStyle(color: AppTheme.errorColor))
+        else ...[
+          _buildSalesList(salesAsync.value ?? [], ledgerAsync.value ?? [], textPrimary, textMuted),
+        ],
       ],
+    );
+  }
+
+  Widget _buildSalesList(List<Sale> posSalesRaw, List<SalesLedgerEntry> ledgerEntriesRaw, Color textPrimary, Color textMuted) {
+    final now = DateTime.now();
+
+    final posSales = posSalesRaw.map((s) {
+      final name = (s.customerName != null && s.customerName!.trim().isNotEmpty)
+          ? s.customerName!.trim()
+          : 'Walk-in Customer';
+      final timeFmt = DateFormat('h:mm a').format(s.saleDate);
+      final isToday = s.saleDate.year == now.year && s.saleDate.month == now.month && s.saleDate.day == now.day;
+      final displayTime = isToday ? timeFmt : '${DateFormat('MMM d').format(s.saleDate)}, $timeFmt';
+      return _UnifiedRecentSale(
+        id: s.id,
+        customerName: name,
+        subtitle: '${s.items.length} item(s) • $displayTime',
+        totalAmount: s.totalAmount,
+        date: s.saleDate,
+      );
+    });
+
+    final ledgerSales = ledgerEntriesRaw.where((e) => e.typeIndex == 1).map((e) {
+      final name = (e.personName != null && e.personName!.trim().isNotEmpty)
+          ? e.personName!.trim()
+          : 'Walk-in Customer';
+      final itemStr = (e.inItem != null && e.inItem!.trim().isNotEmpty) ? e.inItem!.trim() : 'Sale';
+      final qtyStr = (e.quantity != null && e.quantity! > 0) ? '${e.quantity} pcs • ' : '';
+      final timeFmt = DateFormat('h:mm a').format(e.date);
+      final isToday = e.date.year == now.year && e.date.month == now.month && e.date.day == now.day;
+      final displayTime = isToday ? timeFmt : '${DateFormat('MMM d').format(e.date)}, $timeFmt';
+      return _UnifiedRecentSale(
+        id: e.id,
+        customerName: name,
+        subtitle: '$itemStr • $qtyStr$displayTime',
+        totalAmount: e.totalAmount,
+        date: e.date,
+      );
+    });
+
+    final allRecent = [...ledgerSales, ...posSales]..sort((a, b) => b.date.compareTo(a.date));
+    final recent = allRecent.take(5).toList();
+
+    if (recent.isEmpty) {
+      return ModernCard(
+        padding: const EdgeInsets.all(28),
+        child: Column(children: [
+          Icon(Icons.receipt_long_rounded, size: 44, color: textMuted.withOpacity(0.4)),
+          const SizedBox(height: 10),
+          Text('No sales yet. Start selling!', style: TextStyle(color: textMuted, fontSize: 14)),
+        ]),
+      );
+    }
+
+    final fmt = NumberFormat('#,##0', 'en_US');
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: recent.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, i) {
+        final sale = recent[i];
+        return InkWell(
+          onTap: () {
+            ref.read(currentTabProvider.notifier).setTab(1);
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: ModernCard(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(children: [
+              Container(
+                width: 42, height: 42,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.receipt_long_rounded, color: AppTheme.primaryColor, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(sale.customerName,
+                      style: TextStyle(fontWeight: FontWeight.w600, color: textPrimary, fontSize: 14)),
+                  const SizedBox(height: 2),
+                  Text(sale.subtitle,
+                      style: TextStyle(color: textMuted, fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                ],
+              )),
+              const SizedBox(width: 8),
+              Text('₦${fmt.format(sale.totalAmount)}',
+                  style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.successColor, fontSize: 15)),
+            ]),
+          ),
+        );
+      },
     );
   }
 }

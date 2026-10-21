@@ -63,11 +63,13 @@ class CustomerModel extends HiveObject {
       );
 
   factory CustomerModel.fromMap(Map<String, dynamic> map) => CustomerModel(
-        id: map['id'] as String,
-        name: map['name'] as String,
-        phone: map['phone'] as String?,
-        address: map['address'] as String?,
-        updatedAt: DateTime.parse(map['updatedAt'] as String),
+        id: map['id']?.toString() ?? '',
+        name: map['name']?.toString() ?? '',
+        phone: map['phone']?.toString(),
+        address: map['address']?.toString(),
+        shopNumber: map['shopNumber']?.toString(),
+        avatarPath: map['avatarPath']?.toString(),
+        updatedAt: DateTime.tryParse(map['updatedAt']?.toString() ?? '') ?? DateTime.now(),
         isSynced: true,
       );
 
@@ -76,6 +78,8 @@ class CustomerModel extends HiveObject {
         'name': name,
         'phone': phone,
         'address': address,
+        'shopNumber': shopNumber,
+        'avatarPath': avatarPath,
         'updatedAt': updatedAt.toIso8601String(),
       };
 }

@@ -88,12 +88,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     );
 
     if (mounted) {
-      AppFeedback.hideLoading(context);
       if (!success) {
+        AppFeedback.hideLoading(context);
         AppFeedback.showError(context, 'Access Denied', 'Invalid credentials or unauthorized account. Please check your details.');
       } else {
-        // Trigger immediate cloud sync to pull all existing data to the device
-        ref.read(syncServiceProvider).syncAll();
+        try {
+          await ref.read(syncServiceProvider).syncAll(forcePull: true);
+        } catch (_) {}
+        if (mounted) {
+          AppFeedback.hideLoading(context);
+        }
       }
     }
   }

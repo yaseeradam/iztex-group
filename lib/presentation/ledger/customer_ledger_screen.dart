@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,7 +7,6 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'dart:ui' as ui;
-import 'package:path_provider/path_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/pdf_theme.dart';
@@ -895,12 +895,13 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
       final image = await boundary.toImage(pixelRatio: 2.5);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) return;
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/${widget.customerName}_ledger.png');
-      await file.writeAsBytes(byteData.buffer.asUint8List());
       if (!mounted) return;
       // ignore: use_build_context_synchronously
-      await FileSaver.saveImage(context, file);
+      await FileSaver.saveImageBytes(
+        context,
+        byteData.buffer.asUint8List(),
+        '${widget.customerName}_ledger.png',
+      );
     } catch (e) {
       debugPrint('Image export error: $e');
     } finally {
@@ -1298,12 +1299,13 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
       final image = await boundary.toImage(pixelRatio: 3.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) return;
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/${widget.customerName}_entry_${entry.id.substring(0, 6)}.png');
-      await file.writeAsBytes(byteData.buffer.asUint8List());
       if (!mounted) return;
       // ignore: use_build_context_synchronously
-      await FileSaver.saveImage(context, file);
+      await FileSaver.saveImageBytes(
+        context,
+        byteData.buffer.asUint8List(),
+        '${widget.customerName}_entry_${entry.id.substring(0, 6)}.png',
+      );
     } finally {
       overlay.remove();
     }
@@ -1373,15 +1375,17 @@ class _HeaderCard extends StatelessWidget {
               shape: BoxShape.circle,
               color: Colors.white.withValues(alpha: 0.2),
               border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 2),
-              image: (avatarPath != null && avatarPath!.isNotEmpty)
+              image: (avatarPath != null && avatarPath!.isNotEmpty && (!kIsWeb || avatarPath!.startsWith('http') || avatarPath!.startsWith('blob')))
                   ? DecorationImage(
-                      image: FileImage(File(avatarPath!)),
+                      image: kIsWeb
+                          ? NetworkImage(avatarPath!) as ImageProvider
+                          : FileImage(File(avatarPath!)),
                       fit: BoxFit.cover,
                     )
                   : null,
             ),
             alignment: Alignment.center,
-            child: (avatarPath == null || avatarPath!.isEmpty)
+            child: (avatarPath == null || avatarPath!.isEmpty || (kIsWeb && !avatarPath!.startsWith('http') && !avatarPath!.startsWith('blob')))
                 ? Text(
                     customerName.isNotEmpty ? customerName[0].toUpperCase() : '?',
                     style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900),

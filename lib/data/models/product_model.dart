@@ -74,18 +74,35 @@ class ProductModel extends HiveObject {
         imagePath: imagePath,
       );
 
-  factory ProductModel.fromMap(Map<String, dynamic> map) => ProductModel(
-        id: map['id'] as String,
-        name: map['name'] as String,
-        price: (map['price'] as num).toDouble(),
-        costPrice: (map['costPrice'] as num?)?.toDouble() ?? 0.0,
-        quantity: map['quantity'] as int,
-        category: map['category'] as String?,
-        barcode: map['barcode'] as String?,
-        updatedAt: DateTime.parse(map['updatedAt'] as String),
-        isSynced: true,
-        imagePath: map['imagePath'] as String?,
-      );
+  factory ProductModel.fromMap(Map<String, dynamic> map) {
+    final rawPrice = map['price'];
+    final price = (rawPrice is num)
+        ? rawPrice.toDouble()
+        : double.tryParse(rawPrice?.toString() ?? '') ?? 0.0;
+
+    final rawCostPrice = map['costPrice'];
+    final costPrice = (rawCostPrice is num)
+        ? rawCostPrice.toDouble()
+        : double.tryParse(rawCostPrice?.toString() ?? '') ?? 0.0;
+
+    final rawQuantity = map['quantity'];
+    final quantity = (rawQuantity is num)
+        ? rawQuantity.toInt()
+        : int.tryParse(rawQuantity?.toString() ?? '') ?? 0;
+
+    return ProductModel(
+      id: map['id']?.toString() ?? '',
+      name: map['name']?.toString() ?? '',
+      price: price,
+      costPrice: costPrice,
+      quantity: quantity,
+      category: map['category']?.toString(),
+      barcode: map['barcode']?.toString(),
+      updatedAt: DateTime.tryParse(map['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+      isSynced: true,
+      imagePath: map['imagePath']?.toString(),
+    );
+  }
 
   Map<String, dynamic> toMap() => {
         'id': id,

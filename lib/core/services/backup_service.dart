@@ -1,10 +1,9 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
+import '../utils/file_saver.dart';
 
 import '../../data/models/product_model.dart';
 import '../../data/models/customer_model.dart';
@@ -96,13 +95,12 @@ class BackupService {
       final dateStr = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
       final fileName = 'mlintex_backup_$dateStr.json';
 
-      final tempDir = await getTemporaryDirectory();
-      final backupFile = File('${tempDir.path}/$fileName');
-      await backupFile.writeAsString(jsonString);
-
-      await Share.shareXFiles(
-        [XFile(backupFile.path)],
-        text: 'Mlintex Shop Backup Data ($dateStr)',
+      final bytes = Uint8List.fromList(utf8.encode(jsonString));
+      await FileSaver.saveJson(
+        context,
+        fileName,
+        bytes,
+        shareText: 'Mlintex Shop Backup Data ($dateStr)',
         subject: 'Mlintex Backup',
       );
 

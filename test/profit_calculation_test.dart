@@ -1,8 +1,11 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:shop_manager/domain/entities/product.dart';
 import 'package:shop_manager/domain/entities/sale.dart';
 import 'package:shop_manager/data/models/product_model.dart';
 import 'package:shop_manager/data/models/sale_model.dart';
+import 'package:shop_manager/data/models/debt_model.dart';
+import 'package:shop_manager/data/models/customer_ledger_model.dart';
+import 'package:shop_manager/data/models/receive_order_model.dart';
 
 void main() {
   group('Profit Calculation and Models', () {
@@ -130,6 +133,58 @@ void main() {
 
       // Expected: 20 + 100 + 150 = 270
       expect(totalProfit, 270.0);
+    });
+
+    test('Defensive parsing handles mixed types, strings, ints, nulls gracefully', () {
+      // ProductModel with int and string numbers
+      final p = ProductModel.fromMap({
+        'id': 'p1',
+        'name': 'ZENITH',
+        'price': 370000,
+        'costPrice': '150000',
+        'quantity': '10',
+        'category': 'ADVENTURE',
+      });
+      expect(p.price, 370000.0);
+      expect(p.costPrice, 150000.0);
+      expect(p.quantity, 10);
+
+      // DebtModel with int amounts and string booleans
+      final d = DebtModel.fromMap({
+        'id': 'd1',
+        'amount': 5000,
+        'paidAmount': '1000',
+        'isPaid': 'false',
+        'customerName': 'KARE BULLA',
+      });
+      expect(d.amount, 5000.0);
+      expect(d.paidAmount, 1000.0);
+      expect(d.isPaid, false);
+
+      // CustomerLedgerEntryModel with null quantity and string amounts
+      final l = CustomerLedgerEntryModel.fromMap({
+        'id': 'l1',
+        'quantity': null,
+        'totalAmount': 605000,
+        'totalBalance': '605000',
+        'isSynced': true,
+      });
+      expect(l.quantity, null);
+      expect(l.totalAmount, 605000.0);
+      expect(l.totalBalance, 605000.0);
+
+      // ReceiveOrderModel with string total
+      final r = ReceiveOrderModel.fromMap({
+        'id': 'r1',
+        'supplierName': 'TEXTILES CO',
+        'totalAmount': '50000',
+        'items': [
+          {'productId': 'p1', 'productName': 'ZENITH', 'unitPrice': '5000', 'quantity': 10}
+        ],
+      });
+      expect(r.totalAmount, 50000.0);
+      expect(r.items.first.unitPrice, 5000.0);
+      expect(r.items.first.quantity, 10);
     });
   });
 }

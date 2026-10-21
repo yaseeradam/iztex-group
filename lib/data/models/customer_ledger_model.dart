@@ -57,20 +57,39 @@ class CustomerLedgerEntryModel {
         isSynced: isSynced,
       );
 
-  factory CustomerLedgerEntryModel.fromMap(Map<dynamic, dynamic> map) =>
-      CustomerLedgerEntryModel(
-        id: map['id'] as String,
-        customerId: map['customerId'] as String,
-        date: DateTime.parse(map['date'] as String),
-        inDescription: map['inDescription'] as String?,
-        outDescription: map['outDescription'] as String?,
-        price: map['price'] as String?,
-        quantity: map['quantity'] as int?,
-        totalAmount: (map['totalAmount'] as num).toDouble(),
-        totalBalance: (map['totalBalance'] as num).toDouble(),
-        updatedAt: DateTime.parse(map['updatedAt'] as String),
-        isSynced: map['isSynced'] as bool? ?? false,
-      );
+  factory CustomerLedgerEntryModel.fromMap(Map<dynamic, dynamic> map) {
+    final rawQty = map['quantity'];
+    final quantity = (rawQty is num)
+        ? rawQty.toInt()
+        : int.tryParse(rawQty?.toString() ?? '');
+
+    final rawTotal = map['totalAmount'];
+    final totalAmount = (rawTotal is num)
+        ? rawTotal.toDouble()
+        : double.tryParse(rawTotal?.toString() ?? '') ?? 0.0;
+
+    final rawBalance = map['totalBalance'];
+    final totalBalance = (rawBalance is num)
+        ? rawBalance.toDouble()
+        : double.tryParse(rawBalance?.toString() ?? '') ?? 0.0;
+
+    final rawSynced = map['isSynced'];
+    final isSynced = rawSynced == true || rawSynced?.toString().toLowerCase() == 'true';
+
+    return CustomerLedgerEntryModel(
+      id: map['id']?.toString() ?? '',
+      customerId: map['customerId']?.toString() ?? '',
+      date: DateTime.tryParse(map['date']?.toString() ?? '') ?? DateTime.now(),
+      inDescription: map['inDescription']?.toString(),
+      outDescription: map['outDescription']?.toString(),
+      price: map['price']?.toString(),
+      quantity: quantity,
+      totalAmount: totalAmount,
+      totalBalance: totalBalance,
+      updatedAt: DateTime.tryParse(map['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+      isSynced: isSynced,
+    );
+  }
 
   Map<String, dynamic> toMap() => {
         'id': id,

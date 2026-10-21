@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -168,11 +169,16 @@ class _QuickAddShopCustomerSheetState extends ConsumerState<QuickAddShopCustomer
                           shape: BoxShape.circle,
                           color: AppTheme.primaryColor.withOpacity(0.1),
                           border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3), width: 2),
-                          image: _avatarPath != null
-                              ? DecorationImage(image: FileImage(File(_avatarPath!)), fit: BoxFit.cover)
+                          image: (_avatarPath != null && (!kIsWeb || _avatarPath!.startsWith('http') || _avatarPath!.startsWith('blob')))
+                              ? DecorationImage(
+                                  image: kIsWeb
+                                      ? NetworkImage(_avatarPath!) as ImageProvider
+                                      : FileImage(File(_avatarPath!)),
+                                  fit: BoxFit.cover,
+                                )
                               : null,
                         ),
-                        child: _avatarPath == null
+                        child: (_avatarPath == null || (kIsWeb && !_avatarPath!.startsWith('http') && !_avatarPath!.startsWith('blob')))
                             ? Icon(Icons.person_rounded, size: 40, color: AppTheme.primaryColor.withOpacity(0.5))
                             : null,
                       ),

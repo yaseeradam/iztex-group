@@ -7,6 +7,7 @@ import '../../domain/repositories/sale_repository.dart';
 import '../../domain/repositories/product_repository.dart';
 import '../../core/providers/repository_providers.dart';
 import '../products/product_provider.dart';
+import '../sales_ledger/sales_ledger_screen.dart' show salesLedgerEntriesProvider;
 
 /// Cart item for active sale
 class CartItem {
@@ -75,8 +76,31 @@ final salesProvider = StreamProvider<List<Sale>>((ref) {
   return ref.watch(saleRepositoryProvider).watchSales();
 });
 
-final todayRevenueProvider = FutureProvider<double>((ref) {
-  return ref.watch(saleRepositoryProvider).getTodayRevenue();
+final todayRevenueProvider = Provider<double>((ref) {
+  final sales = ref.watch(salesProvider).value ?? [];
+  final ledgerEntries = ref.watch(salesLedgerEntriesProvider).value ?? [];
+
+  final now = DateTime.now();
+  final todayStart = DateTime(now.year, now.month, now.day);
+  final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+
+  double revenue = 0.0;
+  for (final s in sales) {
+    if (s.saleDate.isAfter(todayStart.subtract(const Duration(milliseconds: 1))) &&
+        s.saleDate.isBefore(todayEnd.add(const Duration(milliseconds: 1)))) {
+      revenue += s.totalAmount;
+    }
+  }
+
+  for (final e in ledgerEntries) {
+    if (e.typeIndex == 1 &&
+        e.date.isAfter(todayStart.subtract(const Duration(milliseconds: 1))) &&
+        e.date.isBefore(todayEnd.add(const Duration(milliseconds: 1)))) {
+      revenue += e.totalAmount;
+    }
+  }
+
+  return revenue;
 });
 
 /// Complete a sale
@@ -148,12 +172,14 @@ final saleNotifierProvider = NotifierProvider<SaleNotifier, AsyncValue<void>>(
 );
 
 /// Total Profit calculated across all sales.
-/// Uses each SaleItem's snapshot costPrice, falling back to the current product costPrice.
+/// Uses each SaleItem / Ledger item's price minus product costPrice.
 final totalProfitProvider = Provider<double>((ref) {
   final salesAsync = ref.watch(salesProvider);
+  final ledgerAsync = ref.watch(salesLedgerEntriesProvider);
   final productsAsync = ref.watch(productsProvider);
 
   final sales = salesAsync.value ?? [];
+  final ledgerEntries = ledgerAsync.value ?? [];
   final products = productsAsync.value ?? [];
 
   final productCostById = <String, double>{
@@ -174,15 +200,30 @@ final totalProfitProvider = Provider<double>((ref) {
     }
   }
 
+  for (final e in ledgerEntries) {
+    if (e.typeIndex == 1) {
+      final cost = (e.inItem != null)
+          ? (productCostByName[e.inItem!.trim().toLowerCase()] ?? 0.0)
+          : 0.0;
+      final qty = (e.quantity ?? 1).toDouble();
+      final unitPrice = e.price ?? (qty > 0 ? (e.totalAmount / qty) : e.totalAmount);
+      if (cost > 0) {
+        totalProfit += (unitPrice - cost) * qty;
+      }
+    }
+  }
+
   return totalProfit;
 });
 
 /// Today's Profit calculated from today's sales.
 final todayProfitProvider = Provider<double>((ref) {
   final salesAsync = ref.watch(salesProvider);
+  final ledgerAsync = ref.watch(salesLedgerEntriesProvider);
   final productsAsync = ref.watch(productsProvider);
 
   final sales = salesAsync.value ?? [];
+  final ledgerEntries = ledgerAsync.value ?? [];
   final products = productsAsync.value ?? [];
 
   final productCostById = <String, double>{
@@ -206,6 +247,21 @@ final todayProfitProvider = Provider<double>((ref) {
             productCostByName[item.productName.trim().toLowerCase()] ??
             0.0;
         todayProfit += (item.unitPrice - cost) * item.quantity;
+      }
+    }
+  }
+
+  for (final e in ledgerEntries) {
+    if (e.typeIndex == 1 &&
+        e.date.isAfter(todayStart.subtract(const Duration(milliseconds: 1))) &&
+        e.date.isBefore(todayEnd.add(const Duration(milliseconds: 1)))) {
+      final cost = (e.inItem != null)
+          ? (productCostByName[e.inItem!.trim().toLowerCase()] ?? 0.0)
+          : 0.0;
+      final qty = (e.quantity ?? 1).toDouble();
+      final unitPrice = e.price ?? (qty > 0 ? (e.totalAmount / qty) : e.totalAmount);
+      if (cost > 0) {
+        todayProfit += (unitPrice - cost) * qty;
       }
     }
   }

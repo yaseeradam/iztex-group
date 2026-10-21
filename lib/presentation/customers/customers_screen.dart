@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -604,11 +605,16 @@ class _Avatar extends StatelessWidget {
           colors: [color.withOpacity(0.25), color.withOpacity(0.1)],
         ) : null,
         border: Border.all(color: color.withOpacity(0.35), width: 2),
-        image: avatarPath != null
-            ? DecorationImage(image: FileImage(File(avatarPath!)), fit: BoxFit.cover)
+        image: (avatarPath != null && (!kIsWeb || avatarPath!.startsWith('http') || avatarPath!.startsWith('blob')))
+            ? DecorationImage(
+                image: kIsWeb
+                    ? NetworkImage(avatarPath!) as ImageProvider
+                    : FileImage(File(avatarPath!)),
+                fit: BoxFit.cover,
+              )
             : null,
       ),
-      child: avatarPath == null
+      child: (avatarPath == null || (kIsWeb && !avatarPath!.startsWith('http') && !avatarPath!.startsWith('blob')))
           ? Center(child: Text(initial, style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: size * 0.35)))
           : null,
     );

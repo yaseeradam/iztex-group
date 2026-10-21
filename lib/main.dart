@@ -38,7 +38,9 @@ Future<void> main() async {
   await Hive.openBox('settings');
 
   final authBox = Hive.box('auth');
-  final activeShopId = authBox.get('active_shop_id', defaultValue: '1') as String;
+  final rawActiveShopId = authBox.get('active_shop_id', defaultValue: '1')?.toString() ?? '1';
+  final activeShopId = (rawActiveShopId.isEmpty || rawActiveShopId == 'default') ? '1' : rawActiveShopId;
+  await authBox.put('active_shop_id', activeShopId);
 
   // Shop-specific boxes
   await Hive.openBox<ProductModel>('products_$activeShopId');

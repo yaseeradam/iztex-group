@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Backup data & deployment archives
+*backup*.json
+*.tar.gz

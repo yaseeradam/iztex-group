@@ -11,6 +11,7 @@ import '../widgets/glass_container.dart';
 import '../../core/services/backup_service.dart';
 import '../../core/services/pwa_installer.dart';
 import '../widgets/pwa_install_modal.dart';
+import '../widgets/app_feedback.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -106,15 +107,17 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
                       color: AppTheme.primaryColor.withOpacity(0.3),
                       width: 1.5,
                     ),
-                    image: authState.logoPath != null
+                    image: (authState.logoPath != null && (!kIsWeb || authState.logoPath!.startsWith('http') || authState.logoPath!.startsWith('blob')))
                         ? DecorationImage(
-                            image: FileImage(File(authState.logoPath!)),
+                            image: kIsWeb
+                                ? NetworkImage(authState.logoPath!) as ImageProvider
+                                : FileImage(File(authState.logoPath!)),
                             fit: BoxFit.cover,
                           )
                         : null,
                   ),
                   alignment: Alignment.center,
-                  child: authState.logoPath == null
+                  child: (authState.logoPath == null || (kIsWeb && !authState.logoPath!.startsWith('http') && !authState.logoPath!.startsWith('blob')))
                       ? Text(
                           initial,
                           style: const TextStyle(
@@ -229,11 +232,14 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
                     case SyncStatus.pending:
                       return 'Changes pending upload';
                     case SyncStatus.error:
-                      return '⚠ Sync failed — tap to retry';
+                      final err = ref.watch(syncServiceProvider).lastSyncError;
+                      return err != null && err.isNotEmpty
+                          ? '⚠ Sync failed ($err) — tap to retry'
+                          : '⚠ Sync failed — tap to retry';
                   }
                 },
                 loading: () => 'Checking...',
-                error: (_, __) => 'Status unknown',
+                error: (e, __) => 'Status unknown ($e)',
               ),
               trailing: isSyncing
                   ? const SizedBox(
@@ -243,7 +249,64 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
                     )
                   : const Icon(Icons.chevron_right_rounded,
                       color: AppTheme.textMuted, size: 20),
-              onTap: isSyncing ? null : () => ref.read(syncServiceProvider).syncAll(),
+              onTap: isSyncing
+                  ? null
+                  : () async {
+                      final success = await ref.read(syncServiceProvider).syncAll();
+                      if (context.mounted) {
+                        if (success) {
+                          AppFeedback.showSuccess(
+                            context,
+                            'Sync Successful',
+                            'All data synchronized with cloud database.',
+                          );
+                        } else {
+                          final err = ref.read(syncServiceProvider).lastSyncError ?? 'Unknown error';
+                          AppFeedback.showError(
+                            context,
+                            'Sync Failed',
+                            err,
+                          );
+                        }
+                      }
+                    },
+            ),
+            _ActionTile(
+              icon: Icons.cloud_download_rounded,
+              iconColor: AppTheme.accentColor,
+              title: 'Restore Data from Cloud',
+              subtitle: 'Download all customers, debts, products & ledgers from Firebase',
+              trailing: isSyncing
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.download_rounded,
+                      color: AppTheme.accentColor, size: 20),
+              onTap: isSyncing
+                  ? null
+                  : () async {
+                      AppFeedback.showLoading(context);
+                      final success = await ref.read(syncServiceProvider).syncAll(forcePull: true);
+                      if (context.mounted) {
+                        AppFeedback.hideLoading(context);
+                        if (success) {
+                          AppFeedback.showSuccess(
+                            context,
+                            'Cloud Data Restored',
+                            'All customers, debts, products and ledgers have been restored from Firebase!',
+                          );
+                        } else {
+                          final err = ref.read(syncServiceProvider).lastSyncError ?? 'Unknown error';
+                          AppFeedback.showError(
+                            context,
+                            'Restore Failed',
+                            err,
+                          );
+                        }
+                      }
+                    },
             ),
           ],
         ),

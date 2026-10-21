@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -121,12 +122,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               ),
                               shape: BoxShape.circle,
                               border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3), width: 2),
-                              image: _logoPath != null
-                                  ? DecorationImage(image: FileImage(File(_logoPath!)), fit: BoxFit.cover)
+                              image: (_logoPath != null && (!kIsWeb || _logoPath!.startsWith('http') || _logoPath!.startsWith('blob')))
+                                  ? DecorationImage(
+                                      image: kIsWeb
+                                          ? NetworkImage(_logoPath!) as ImageProvider
+                                          : FileImage(File(_logoPath!)),
+                                      fit: BoxFit.cover,
+                                    )
                                   : null,
                             ),
                             alignment: Alignment.center,
-                            child: _logoPath == null
+                            child: (_logoPath == null || (kIsWeb && !_logoPath!.startsWith('http') && !_logoPath!.startsWith('blob')))
                                 ? Text(initial, style: const TextStyle(color: AppTheme.primaryColor, fontSize: 40, fontWeight: FontWeight.w800))
                                 : null,
                           ),

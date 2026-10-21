@@ -480,5 +480,15 @@ final authProvider = NotifierProvider<AuthNotifier, AuthState>(
 
 final activeShopIdProvider = Provider<String>((ref) {
   final authState = ref.watch(authProvider);
-  return authState.activeShopId;
+  if (authState.activeShopId.isNotEmpty) {
+    return authState.activeShopId;
+  }
+  try {
+    if (Hive.isBoxOpen('auth')) {
+      final box = Hive.box('auth');
+      final savedId = box.get('active_shop_id', defaultValue: '1') as String;
+      if (savedId.isNotEmpty) return savedId;
+    }
+  } catch (_) {}
+  return '1';
 });

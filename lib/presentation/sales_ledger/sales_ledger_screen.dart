@@ -1,11 +1,9 @@
-import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -307,14 +305,6 @@ class _SalesLedgerScreenState extends ConsumerState<SalesLedgerScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _HeaderCard(
-                      shopName: authState.shopName,
-                      cardBg: cardBg,
-                      borderColor: borderColor,
-                      textPrimary: textPrimary,
-                      textMuted: textMuted,
-                    ),
-                    const SizedBox(height: 16),
                     _FinancialSummaryCard(
                       totalIn: totalIn,
                       totalOut: totalOut,
@@ -880,11 +870,12 @@ class _SalesLedgerScreenState extends ConsumerState<SalesLedgerScreen> {
       final image = await boundary.toImage(pixelRatio: 3.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) return;
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/sales_entry_${entry.id.substring(0, 6)}.png');
-      await file.writeAsBytes(byteData.buffer.asUint8List());
       if (!mounted) return;
-      await FileSaver.saveImage(context, file);
+      await FileSaver.saveImageBytes(
+        context,
+        byteData.buffer.asUint8List(),
+        'sales_entry_${entry.id.substring(0, 6)}.png',
+      );
     } finally {
       overlay.remove();
     }
@@ -1108,11 +1099,12 @@ class _SalesLedgerScreenState extends ConsumerState<SalesLedgerScreen> {
       final image = await boundary.toImage(pixelRatio: 2.5);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) return;
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/sales_ledger.png');
-      await file.writeAsBytes(byteData.buffer.asUint8List());
       if (!mounted) return;
-      await FileSaver.saveImage(context, file);
+      await FileSaver.saveImageBytes(
+        context,
+        byteData.buffer.asUint8List(),
+        'sales_ledger.png',
+      );
     } catch (e) {
       debugPrint('Image export error: $e');
     } finally {
