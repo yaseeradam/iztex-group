@@ -50,7 +50,9 @@ class ConnectivityService {
     return results.any((r) =>
         r == ConnectivityResult.wifi ||
         r == ConnectivityResult.mobile ||
-        r == ConnectivityResult.ethernet);
+        r == ConnectivityResult.ethernet ||
+        r == ConnectivityResult.vpn ||
+        r == ConnectivityResult.other);
   }
 
   void dispose() {

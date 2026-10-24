@@ -43,5 +43,6 @@ class DefaultFirebaseOptions {
     messagingSenderId: '813733906604',
     projectId: 'mlintex-17ad8',
     storageBucket: 'mlintex-17ad8.firebasestorage.app',
+    iosBundleId: 'com.example.shopManager',
   );
 }

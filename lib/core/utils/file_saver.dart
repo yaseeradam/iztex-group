@@ -10,29 +10,48 @@ class FileSaver {
   /// Saves / shares PDF bytes cross-platform (Web, iOS, Android, macOS, Windows).
   static Future<void> savePdf(BuildContext context, String filename, List<int> bytes) async {
     final u8bytes = Uint8List.fromList(bytes);
+
+    // Calculate origin Rect for iPad / iOS popovers
+    Rect? origin;
+    try {
+      if (context.mounted) {
+        final box = context.findRenderObject() as RenderBox?;
+        if (box != null && box.hasSize) {
+          origin = box.localToGlobal(Offset.zero) & box.size;
+        }
+      }
+    } catch (_) {}
+
+    // Fallback origin to center of screen if context renderbox had no size
+    if (origin == null && context.mounted) {
+      try {
+        final mediaQuery = MediaQuery.of(context);
+        origin = Rect.fromCenter(
+          center: Offset(mediaQuery.size.width / 2, mediaQuery.size.height / 2),
+          width: 1,
+          height: 1,
+        );
+      } catch (_) {}
+    }
+
     try {
       // On Web, iOS, and Android, Printing.sharePdf provides the cleanest native experience:
-      // - Web (Safari / Chrome): downloads the PDF file with the specified filename
+      // - Web (Safari / Chrome): downloads the PDF or opens Web Share
       // - iOS: opens native UIActivityViewController with AirDrop, Save to Files, Print, Share
       // - Android: opens Android Sharesheet
       final shared = await Printing.sharePdf(
         bytes: u8bytes,
         filename: filename,
+        bounds: origin,
       );
 
       if (!shared && kIsWeb) {
-        // Fallback for Web browsers: opens PDF layout/preview dialog where user can save or print
-        await Printing.layoutPdf(
-          onLayout: (format) async => u8bytes,
-          name: filename,
-        );
+        downloadFileWebPlatform(u8bytes, filename, 'application/pdf');
       }
     } catch (e) {
+      debugPrint('[FileSaver] Printing.sharePdf error: $e');
       // Secondary fallback using in-memory XFile.fromData (no path_provider / temporary file required)
       try {
-        final box = context.mounted ? (context.findRenderObject() as RenderBox?) : null;
-        final origin = box != null ? (box.localToGlobal(Offset.zero) & box.size) : null;
-
         final xFile = XFile.fromData(
           u8bytes,
           name: filename,
@@ -43,6 +62,7 @@ class FileSaver {
           downloadFileWebPlatform(u8bytes, filename, 'application/pdf');
         }
       } catch (fallbackError) {
+        debugPrint('[FileSaver] Fallback share error: $fallbackError');
         if (kIsWeb) {
           downloadFileWebPlatform(u8bytes, filename, 'application/pdf');
         } else if (context.mounted) {
@@ -66,8 +86,26 @@ class FileSaver {
     String? subject,
   }) async {
     try {
-      final box = context.mounted ? (context.findRenderObject() as RenderBox?) : null;
-      final origin = box != null ? (box.localToGlobal(Offset.zero) & box.size) : null;
+      Rect? origin;
+      try {
+        if (context.mounted) {
+          final box = context.findRenderObject() as RenderBox?;
+          if (box != null && box.hasSize) {
+            origin = box.localToGlobal(Offset.zero) & box.size;
+          }
+        }
+      } catch (_) {}
+
+      if (origin == null && context.mounted) {
+        try {
+          final mediaQuery = MediaQuery.of(context);
+          origin = Rect.fromCenter(
+            center: Offset(mediaQuery.size.width / 2, mediaQuery.size.height / 2),
+            width: 1,
+            height: 1,
+          );
+        } catch (_) {}
+      }
 
       final xFile = XFile.fromData(
         bytes,

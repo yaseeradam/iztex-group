@@ -35,6 +35,15 @@ class PendingSyncTracker {
     if (existing.remove(id)) {
       _box.put(collection, existing);
     }
+    if (collection.contains('_')) {
+      final base = collection.substring(0, collection.lastIndexOf('_'));
+      if (base.isNotEmpty) {
+        final baseList = getPendingIds(base);
+        if (baseList.remove(id)) {
+          _box.put(base, baseList);
+        }
+      }
+    }
   }
 
   /// Mark a record as pending deletion from cloud
@@ -57,15 +66,37 @@ class PendingSyncTracker {
     if (existing.remove(id)) {
       _deleteBox.put(collection, existing);
     }
+    if (collection.contains('_')) {
+      final base = collection.substring(0, collection.lastIndexOf('_'));
+      if (base.isNotEmpty) {
+        final baseList = getPendingDeleteIds(base);
+        if (baseList.remove(id)) {
+          _deleteBox.put(base, baseList);
+        }
+      }
+    }
   }
 
   /// Get all IDs pending deletion for a given collection
   static List<String> getPendingDeleteIds(String collection) {
     final raw = _deleteBox.get(collection);
+    final list = <String>[];
     if (raw is List) {
-      return raw.map((e) => e.toString()).toList();
+      list.addAll(raw.map((e) => e.toString()));
     }
-    return <String>[];
+    if (collection.contains('_')) {
+      final base = collection.substring(0, collection.lastIndexOf('_'));
+      if (base.isNotEmpty) {
+        final baseRaw = _deleteBox.get(base);
+        if (baseRaw is List) {
+          for (final item in baseRaw) {
+            final s = item.toString();
+            if (!list.contains(s)) list.add(s);
+          }
+        }
+      }
+    }
+    return list;
   }
 
   /// Check if a specific item is queued for deletion
@@ -76,10 +107,23 @@ class PendingSyncTracker {
   /// Get all IDs pending sync for a given collection
   static List<String> getPendingIds(String collection) {
     final raw = _box.get(collection);
+    final list = <String>[];
     if (raw is List) {
-      return raw.map((e) => e.toString()).toList();
+      list.addAll(raw.map((e) => e.toString()));
     }
-    return <String>[];
+    if (collection.contains('_')) {
+      final base = collection.substring(0, collection.lastIndexOf('_'));
+      if (base.isNotEmpty) {
+        final baseRaw = _box.get(base);
+        if (baseRaw is List) {
+          for (final item in baseRaw) {
+            final s = item.toString();
+            if (!list.contains(s)) list.add(s);
+          }
+        }
+      }
+    }
+    return list;
   }
 
   /// Mark all IDs in a collection as synced

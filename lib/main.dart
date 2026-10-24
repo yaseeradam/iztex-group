@@ -81,9 +81,9 @@ Future<void> main() async {
   };
   await connectivityService.init();
 
-  // Initial background sync trigger on app startup
+  // Initial background sync trigger on app startup (forcePull ensures latest cloud data is pulled)
   try {
-    container.read(syncServiceProvider).syncAll();
+    container.read(syncServiceProvider).syncAll(forcePull: true);
   } catch (_) {}
 
   runApp(

@@ -310,7 +310,7 @@ class SyncService {
       // ============================================
       // 2. PULL: ALL CLOUD DATA BACK TO LOCAL HIVE
       // ============================================
-      final targetShopIds = {currentShopId, '1', ''};
+      final targetShopIds = {currentShopId, '1'};
       for (final sId in targetShopIds) {
         await _pullData<ProductModel>(
           db: db, userId: userId, collection: 'products', boxName: 'products_$sId',
