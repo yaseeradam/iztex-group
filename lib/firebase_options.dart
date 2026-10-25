@@ -30,11 +30,11 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyB0bfuzfVO6PR28erEWn0dzVuwAa74vCn8',
-    appId: '1:813733906604:android:3075f9f91ddcde1dc27709',
-    messagingSenderId: '813733906604',
-    projectId: 'mlintex-17ad8',
-    storageBucket: 'mlintex-17ad8.firebasestorage.app',
+    apiKey: 'AIzaSyB2SK6ksjgj7nY7vvk1_qWEmnINxY3s2GA',
+    appId: '1:634361097140:android:b54f976da0f0a39ac460e1',
+    messagingSenderId: '634361097140',
+    projectId: 'iztex-group',
+    storageBucket: 'iztex-group.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(

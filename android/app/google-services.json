@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "813733906604",
-    "project_id": "mlintex-17ad8",
-    "storage_bucket": "mlintex-17ad8.firebasestorage.app"
+    "project_number": "634361097140",
+    "project_id": "iztex-group",
+    "storage_bucket": "iztex-group.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:813733906604:android:3075f9f91ddcde1dc27709",
+        "mobilesdk_app_id": "1:634361097140:android:b54f976da0f0a39ac460e1",
         "android_client_info": {
-          "package_name": "com.example.shop_manager"
+          "package_name": "com.iztexgroup.shop_manager"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyB0bfuzfVO6PR28erEWn0dzVuwAa74vCn8"
+          "current_key": "AIzaSyB2SK6ksjgj7nY7vvk1_qWEmnINxY3s2GA"
         }
       ],
       "services": {
