@@ -39,8 +39,8 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyB2SK6ksjgj7nY7vvk1_qWEmnINxY3s2GA',
-    appId: '1:634361097140:ios:3075f9f91ddcde1dc27709',
+    apiKey: 'AIzaSyDp25lOlwd0a6KI1V01XbEg7A-XEXrLMk0',
+    appId: '1:634361097140:ios:1130be272e62838ac460e1',
     messagingSenderId: '634361097140',
     projectId: 'iztex-group',
     storageBucket: 'iztex-group.firebasestorage.app',
