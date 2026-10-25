@@ -21,12 +21,13 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyB0bfuzfVO6PR28erEWn0dzVuwAa74vCn8',
-    appId: '1:813733906604:web:3075f9f91ddcde1dc27709',
-    messagingSenderId: '813733906604',
-    projectId: 'mlintex-17ad8',
-    authDomain: 'mlintex-17ad8.firebaseapp.com',
-    storageBucket: 'mlintex-17ad8.firebasestorage.app',
+    apiKey: 'AIzaSyAu9mkXGU91uqfogZQFt9tbrtt6znQl-to',
+    appId: '1:634361097140:web:59f0173da0984fe1c460e1',
+    messagingSenderId: '634361097140',
+    projectId: 'iztex-group',
+    authDomain: 'iztex-group.firebaseapp.com',
+    storageBucket: 'iztex-group.firebasestorage.app',
+    measurementId: 'G-W50SLJVV4J',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
@@ -38,11 +39,11 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyB0bfuzfVO6PR28erEWn0dzVuwAa74vCn8',
-    appId: '1:813733906604:ios:3075f9f91ddcde1dc27709',
-    messagingSenderId: '813733906604',
-    projectId: 'mlintex-17ad8',
-    storageBucket: 'mlintex-17ad8.firebasestorage.app',
+    apiKey: 'AIzaSyB2SK6ksjgj7nY7vvk1_qWEmnINxY3s2GA',
+    appId: '1:634361097140:ios:3075f9f91ddcde1dc27709',
+    messagingSenderId: '634361097140',
+    projectId: 'iztex-group',
+    storageBucket: 'iztex-group.firebasestorage.app',
     iosBundleId: 'com.iztexgroup.shopManager',
   );
 }
