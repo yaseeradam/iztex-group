@@ -554,7 +554,7 @@ class _SalesLedgerScreenState extends ConsumerState<SalesLedgerScreen> {
       build: (ctx) => pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Text(auth.shopName.isEmpty || auth.shopName.toLowerCase() == 'admin' ? 'M Lin Tex' : auth.shopName, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+          pw.Text(auth.shopName.isEmpty || auth.shopName.toLowerCase() == 'admin' ? 'IZTEX GROUP' : auth.shopName, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
           pw.SizedBox(height: 2),
           pw.Text('Sales Ledger Entry', style: const pw.TextStyle(fontSize: 10)),
           pw.SizedBox(height: 10),
@@ -689,7 +689,7 @@ class _SalesLedgerScreenState extends ConsumerState<SalesLedgerScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(auth.shopName.isEmpty || auth.shopName.toLowerCase() == 'admin' ? 'M Lin Tex' : auth.shopName,
+                        Text(auth.shopName.isEmpty || auth.shopName.toLowerCase() == 'admin' ? 'IZTEX GROUP' : auth.shopName,
                             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.primaryColor)),
                         const SizedBox(height: 4),
                         const Text('TRANSACTION RECEIPT',
@@ -992,7 +992,7 @@ class _SalesLedgerScreenState extends ConsumerState<SalesLedgerScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(auth.shopName.isEmpty || auth.shopName.toLowerCase() == 'admin' ? 'M Lin Tex' : auth.shopName,
+                  Text(auth.shopName.isEmpty || auth.shopName.toLowerCase() == 'admin' ? 'IZTEX GROUP' : auth.shopName,
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.primaryColor)),
                   const SizedBox(height: 4),
                   const Text('Sales Ledger', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: textColor)),
@@ -1136,7 +1136,7 @@ class _HeaderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displayShop = (shopName.isEmpty || shopName.toLowerCase() == 'admin')
-        ? 'M Lin Tex'
+        ? 'IZTEX GROUP'
         : shopName;
 
     return Container(

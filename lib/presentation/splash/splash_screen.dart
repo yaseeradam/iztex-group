@@ -179,7 +179,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   FadeTransition(
                     opacity: _titleOpacity,
                     child: const Text(
-                      'M Lin Tex',
+                      'IZTEX GROUP',
                       style: TextStyle(
                         fontSize: 42,
                         fontWeight: FontWeight.w900,

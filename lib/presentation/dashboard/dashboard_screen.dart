@@ -214,7 +214,7 @@ class _HeroBanner extends StatelessWidget {
                   children: [
                     Text(greeting, style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 12, fontWeight: FontWeight.w500)),
                     Text(
-                      authState.shopName.isEmpty ? 'M Lin Tex' : authState.shopName,
+                      authState.shopName.isEmpty ? 'IZTEX GROUP' : authState.shopName,
                       style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.3),
                     ),
                   ],

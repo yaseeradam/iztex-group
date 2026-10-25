@@ -141,7 +141,7 @@ class _PwaInstallModalState extends State<PwaInstallModal> {
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      'Install M Lin Tex',
+                      'Install IZTEX GROUP',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
@@ -162,7 +162,7 @@ class _PwaInstallModalState extends State<PwaInstallModal> {
           const SizedBox(height: 16),
 
           const Text(
-            'Add M Lin Tex to your home screen for instant offline bookkeeping, fullscreen display, and fast access.',
+            'Add IZTEX GROUP to your home screen for instant offline bookkeeping, fullscreen display, and fast access.',
             style: TextStyle(
               fontSize: 13,
               height: 1.45,

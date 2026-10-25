@@ -343,7 +343,7 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
             crossAxisAlignment: pw.CrossAxisAlignment.end,
             children: [
               pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                pw.Text(auth.shopName.isEmpty || auth.shopName.toLowerCase() == 'admin' ? 'M Lin Tex' : auth.shopName, style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                pw.Text(auth.shopName.isEmpty || auth.shopName.toLowerCase() == 'admin' ? 'IZTEX GROUP' : auth.shopName, style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
                 pw.SizedBox(height: 3),
                 pw.Text('Customer: ${widget.customerName}', style: const pw.TextStyle(fontSize: 11)),
                 if (widget.customerPhone != null)
@@ -668,7 +668,7 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(auth.shopName.isEmpty || auth.shopName.toLowerCase() == 'admin' ? 'M Lin Tex' : auth.shopName,
+                        Text(auth.shopName.isEmpty || auth.shopName.toLowerCase() == 'admin' ? 'IZTEX GROUP' : auth.shopName,
                             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.primaryColor)),
                         const SizedBox(height: 8),
                         Row(children: [
@@ -1015,7 +1015,7 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
       build: (ctx) => pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Text(auth.shopName.isEmpty || auth.shopName.toLowerCase() == 'admin' ? 'M Lin Tex' : auth.shopName, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+          pw.Text(auth.shopName.isEmpty || auth.shopName.toLowerCase() == 'admin' ? 'IZTEX GROUP' : auth.shopName, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
           pw.SizedBox(height: 2),
           pw.Text('Customer: ${widget.customerName}', style: const pw.TextStyle(fontSize: 10)),
           if (widget.customerPhone != null)
@@ -1131,7 +1131,7 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(auth.shopName.isEmpty || auth.shopName.toLowerCase() == 'admin' ? 'M Lin Tex' : auth.shopName,
+                        Text(auth.shopName.isEmpty || auth.shopName.toLowerCase() == 'admin' ? 'IZTEX GROUP' : auth.shopName,
                             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.primaryColor)),
                         const SizedBox(height: 4),
                         const Text('TRANSACTION RECEIPT',
@@ -1341,7 +1341,7 @@ class _HeaderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     // Resolve display shop name (fall back to app name if not set)
     final displayShop = (shopName.isEmpty || shopName.toLowerCase() == 'admin')
-        ? 'M Lin Tex'
+        ? 'IZTEX GROUP'
         : shopName;
 
     return Container(

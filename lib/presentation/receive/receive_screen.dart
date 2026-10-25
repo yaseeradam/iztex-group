@@ -598,7 +598,7 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
       build: (ctx) => pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Text(auth.shopName.isEmpty || auth.shopName.toLowerCase() == 'admin' ? 'M Lin Tex' : auth.shopName, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+          pw.Text(auth.shopName.isEmpty || auth.shopName.toLowerCase() == 'admin' ? 'IZTEX GROUP' : auth.shopName, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
           pw.SizedBox(height: 2),
           pw.Text('Stock Inward Receipt', style: const pw.TextStyle(fontSize: 10)),
           pw.SizedBox(height: 10),
@@ -710,7 +710,7 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(auth.shopName.isEmpty || auth.shopName.toLowerCase() == 'admin' ? 'M Lin Tex' : auth.shopName,
+                        Text(auth.shopName.isEmpty || auth.shopName.toLowerCase() == 'admin' ? 'IZTEX GROUP' : auth.shopName,
                             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: accentColor)),
                         const SizedBox(height: 4),
                         const Text('STOCK INWARD RECEIPT',
@@ -878,7 +878,7 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
   Future<void> _exportPdf(List<ReceiveEntry> entries, NumberFormat fmt, DateFormat dateFmt) async {
     final pdf = pw.Document(theme: await PdfTheme.load());
     final auth = ref.read(authProvider);
-    final shopName = auth.shopName.isEmpty || auth.shopName.toLowerCase() == 'admin' ? 'M Lin Tex' : auth.shopName;
+    final shopName = auth.shopName.isEmpty || auth.shopName.toLowerCase() == 'admin' ? 'IZTEX GROUP' : auth.shopName;
 
     final rows = buildUiRows(entries);
 
@@ -1287,7 +1287,7 @@ class _HeaderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displayShop = (shopName.isEmpty || shopName.toLowerCase() == 'admin')
-        ? 'M Lin Tex'
+        ? 'IZTEX GROUP'
         : shopName;
 
     return Container(

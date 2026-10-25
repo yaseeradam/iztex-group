@@ -145,7 +145,7 @@ class AuthNotifier extends Notifier<AuthState> {
     final activeShopId = box.get(_keyActiveShopId, defaultValue: '1') as String;
 
     if (rawShops.isEmpty) {
-      const shopName = 'M Lin Tex';
+      const shopName = 'IZTEX GROUP';
       final defaultShop = {
         'id': '1',
         'name': shopName,
@@ -164,7 +164,7 @@ class AuthNotifier extends Notifier<AuthState> {
       await box.put(_keyActiveShopId, '1');
 
       state = const AuthState.authenticated(
-        email: 'mlintex@gmail.com',
+        email: 'iztexgroup@gmail.com',
         shopName: shopName,
         phone: '',
         shopNumber: '',
@@ -193,7 +193,7 @@ class AuthNotifier extends Notifier<AuthState> {
 
       state = AuthState.authenticated(
         email: cleanEmail,
-        shopName: activeShop['name'] as String? ?? 'M Lin Tex',
+        shopName: activeShop['name'] as String? ?? 'IZTEX GROUP',
         phone: activeShop['phone'] as String? ?? '',
         shopNumber: activeShop['shopNumber'] as String? ?? '',
         address: activeShop['address'] as String? ?? '',
