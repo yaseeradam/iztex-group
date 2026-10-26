@@ -190,7 +190,7 @@ class _PwaInstallModalState extends State<PwaInstallModal> {
                 SizedBox(height: 10),
                 _FeatureRow(
                   icon: Icons.fullscreen_rounded,
-                  iconColor: Color(0xFF6366F1),
+                  iconColor: Color(0xFF0F3D91),
                   title: 'Clean Fullscreen Experience',
                   description: 'Zero browser tabs or address bars distracting you.',
                 ),

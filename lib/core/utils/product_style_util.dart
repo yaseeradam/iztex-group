@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 class ProductStyleUtil {
   static final Map<String, ProductStyleData> _categoryStyles = {
     'fabric': ProductStyleData(
-      colors: [const Color(0xFF6366F1), const Color(0xFF4F46E5)],
+      colors: [const Color(0xFF0F3D91), const Color(0xFF1E3A8A)],
       icon: Icons.content_cut_rounded,
     ),
     'fabrics': ProductStyleData(
-      colors: [const Color(0xFF6366F1), const Color(0xFF4F46E5)],
+      colors: [const Color(0xFF0F3D91), const Color(0xFF1E3A8A)],
       icon: Icons.content_cut_rounded,
     ),
     'lace': ProductStyleData(
@@ -71,7 +71,7 @@ class ProductStyleUtil {
       icon: Icons.checkroom_rounded,
     ),
     'roman': ProductStyleData(
-      colors: [const Color(0xFF6366F1), const Color(0xFF4F46E5)],
+      colors: [const Color(0xFF0F3D91), const Color(0xFF1E3A8A)],
       icon: Icons.content_cut_rounded,
     ),
     'senator': ProductStyleData(
@@ -105,7 +105,7 @@ class ProductStyleUtil {
   };
 
   static final List<ProductStyleData> _fallbacks = [
-    ProductStyleData(colors: [const Color(0xFF6366F1), const Color(0xFF4F46E5)], icon: Icons.content_cut_rounded),
+    ProductStyleData(colors: [const Color(0xFF0F3D91), const Color(0xFF1E3A8A)], icon: Icons.content_cut_rounded),
     ProductStyleData(colors: [const Color(0xFFF472B6), const Color(0xFFDB2777)], icon: Icons.checkroom_rounded),
     ProductStyleData(colors: [const Color(0xFF34D399), const Color(0xFF059669)], icon: Icons.eco_rounded),
     ProductStyleData(colors: [const Color(0xFFFBBF24), const Color(0xFFD97706)], icon: Icons.palette_rounded),

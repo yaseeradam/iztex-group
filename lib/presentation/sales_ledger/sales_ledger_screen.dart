@@ -1146,7 +1146,7 @@ class _HeaderCard extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF6366F1), Color(0xFF4F46E5), Color(0xFF3730A3)],
+          colors: [Color(0xFF0F3D91), Color(0xFF1E3A8A), Color(0xFF0A192F)],
         ),
         borderRadius: BorderRadius.circular(16),
       ),
@@ -1310,7 +1310,7 @@ class _FinancialSummaryCard extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              buildItem('TOTAL PAID', totalOut, const Color(0xFF6366F1), const Color(0xFFEEF2FF), Icons.check_circle_outline_rounded),
+              buildItem('TOTAL PAID', totalOut, const Color(0xFF0F3D91), const Color(0xFFEFF6FF), Icons.check_circle_outline_rounded),
               const SizedBox(width: 8),
               buildItem(
                 'BALANCE',
