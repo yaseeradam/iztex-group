@@ -258,7 +258,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             _buildInput(
               controller: _emailController,
               label: 'Email Address',
-              hint: 'mlintex@gmail.com',
+              hint: 'iztexgroup@gmail.com',
               icon: Icons.email_outlined,
               keyboardType: TextInputType.emailAddress,
               validator: (v) => v!.trim().isEmpty ? 'Email is required' : null,

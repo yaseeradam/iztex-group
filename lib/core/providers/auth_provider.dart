@@ -87,14 +87,14 @@ class AuthNotifier extends Notifier<AuthState> {
   }) async {
     final cleanEmail = email.trim().toLowerCase();
     
-    // Strict restriction to single authorized user credentials (accepting mlintex@gmail.com or mlintext@gmail.com)
-    final isAuthorizedEmail = cleanEmail == 'mlintex@gmail.com' || cleanEmail == 'mlintext@gmail.com';
-    if (!isAuthorizedEmail || password != 'mlintex123') {
+    // Strict restriction to single authorized user credentials (accepting iztexgroup@gmail.com or iztex@gmail.com)
+    final isAuthorizedEmail = cleanEmail == 'iztexgroup@gmail.com' || cleanEmail == 'iztex@gmail.com';
+    if (!isAuthorizedEmail || password != 'iztex123') {
       return false;
     }
 
     // Always use canonical email for Firebase Auth so all devices share the exact same UID & Firestore data
-    const canonicalAuthEmail = 'mlintex@gmail.com';
+    const canonicalAuthEmail = 'iztexgroup@gmail.com';
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: canonicalAuthEmail,
