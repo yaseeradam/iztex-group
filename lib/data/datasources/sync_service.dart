@@ -60,8 +60,8 @@ class SyncService {
     var user = FirebaseAuth.instance.currentUser;
     if (user != null) return user;
 
-    const canonicalEmail = 'mlintex@gmail.com';
-    const canonicalPass = 'mlintex123';
+    const canonicalEmail = 'iztexgroup@gmail.com';
+    const canonicalPass = 'iztex123';
     return await FirestoreService.ensureAuthenticated(
       canonicalEmail: canonicalEmail,
       canonicalPassword: canonicalPass,

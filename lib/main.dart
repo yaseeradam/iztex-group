@@ -29,8 +29,8 @@ Future<void> main() async {
   // Pre-authenticate canonical Firebase Auth session so Firestore queries are ready immediately
   try {
     await FirestoreService.ensureAuthenticated(
-      canonicalEmail: 'mlintex@gmail.com',
-      canonicalPassword: 'mlintex123',
+      canonicalEmail: 'iztexgroup@gmail.com',
+      canonicalPassword: 'iztex123',
     );
   } catch (e) {
     debugPrint('Firebase Auth bootstrap error: $e');
