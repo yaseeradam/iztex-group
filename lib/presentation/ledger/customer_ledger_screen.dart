@@ -291,7 +291,10 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
   }
 
   Future<void> _exportPdf(List<LedgerEntry> entries, AuthState auth) async {
-    final pdf = pw.Document(theme: await PdfTheme.load());
+    final pdf = pw.Document(
+      theme: await PdfTheme.load(),
+      title: '${widget.customerName} - Customer Statement',
+    );
     final fmt = NumberFormat('#,##0', 'en_US');
     final dateFmt = DateFormat('yyyy-MM-dd HH:mm:ss');
 
@@ -384,10 +387,10 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
                   hCell('Date'),
                   hCell('Item/Desc'),
                   hCell('Qty', alignment: pw.Alignment.center),
-                  hCell('Price (₦)', alignment: pw.Alignment.centerRight),
-                  hCell('OUT (₦)', alignment: pw.Alignment.centerRight),
+                  hCell('Price (${PdfTheme.naira})', alignment: pw.Alignment.centerRight),
+                  hCell('OUT (${PdfTheme.naira})', alignment: pw.Alignment.centerRight),
                   hCell('Total Amt', alignment: pw.Alignment.centerRight),
-                  hCell('Balance (₦)', alignment: pw.Alignment.centerRight),
+                  hCell('Balance (${PdfTheme.naira})', alignment: pw.Alignment.centerRight),
                 ],
               ),
               ...entries.asMap().entries.map((e) {
@@ -398,7 +401,7 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
 
                 // Same logic as UI table
                 final desc = isSale ? (entry.inItem ?? '') : '';
-                final qtyStr = isSale ? (entry.quantity?.toString() ?? '1') : '—';
+                final qtyStr = isSale ? (entry.quantity?.toString() ?? '1') : '-';
                 // Price col: unit price for sales, payment method name for payments
                 final priceStr = isSale
                     ? fmt.format(entry.price)
@@ -406,7 +409,7 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
                 // OUT col: payment amount for payments, — for sales
                 final outStr = !isSale
                     ? '${PdfTheme.naira}${fmt.format(entry.totalAmount)}'
-                    : '—';
+                    : '-';
                 // Total Amt col: always the total
                 final totalAmtStr = '${PdfTheme.naira}${fmt.format(entry.totalAmount)}';
 
@@ -799,7 +802,7 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
                                   
                                   final dateStr = DateFormat('dd/MM/yy').format(entry.date);
                                   final descStr = isSale ? (entry.inItem ?? '') : '';
-                                  final qtyStr = isSale ? entry.quantity?.toString() ?? '1' : '—';
+                                  final qtyStr = isSale ? entry.quantity?.toString() ?? '1' : '-';
                                   final priceStr = isSale ? fmt.format(entry.price) : (entry.outItem ?? '');
                                   final totalAmtStr = fmt.format(entry.totalAmount);
                                   final outStr = !isSale ? fmt.format(entry.totalAmount) : '—';
@@ -990,7 +993,10 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
     DateFormat dateFmt,
   ) async {
     final isSale = entry.type == LedgerEntryType.sale;
-    final pdf = pw.Document(theme: await PdfTheme.load());
+    final pdf = pw.Document(
+      theme: await PdfTheme.load(),
+      title: '${widget.customerName} - Customer Statement',
+    );
 
     pw.Widget hCell(String t, {pw.Alignment alignment = pw.Alignment.centerLeft}) => pw.Container(
       alignment: alignment,
@@ -1004,10 +1010,10 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
     );
 
     final desc = isSale ? (entry.inItem ?? '') : '';
-    final qtyStr = isSale ? entry.quantity?.toString() ?? '1' : '—';
+    final qtyStr = isSale ? entry.quantity?.toString() ?? '1' : '-';
     final priceStr = isSale ? fmt.format(entry.price) : (entry.outItem ?? '');
     final goodsTotal = '${PdfTheme.naira}${fmt.format(entry.totalAmount)}';
-    final paymentReceived = !isSale ? fmt.format(entry.totalAmount) : '—';
+    final paymentReceived = !isSale ? fmt.format(entry.totalAmount) : '-';
 
     pdf.addPage(pw.Page(
       pageFormat: PdfPageFormat.a4.landscape,
@@ -1045,10 +1051,10 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
                   hCell('Date'),
                   hCell('Item/Desc'),
                   hCell('Qty', alignment: pw.Alignment.center),
-                  hCell('Price (₦)', alignment: pw.Alignment.centerRight),
-                  hCell('OUT (₦)', alignment: pw.Alignment.centerRight),
+                  hCell('Price (${PdfTheme.naira})', alignment: pw.Alignment.centerRight),
+                  hCell('OUT (${PdfTheme.naira})', alignment: pw.Alignment.centerRight),
                   hCell('Total Amt', alignment: pw.Alignment.centerRight),
-                  hCell('Balance (₦)', alignment: pw.Alignment.centerRight),
+                  hCell('Balance (${PdfTheme.naira})', alignment: pw.Alignment.centerRight),
                 ],
               ),
               pw.TableRow(
@@ -1058,7 +1064,7 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
                   dCell(qtyStr, alignment: pw.Alignment.center),
                   dCell(priceStr, alignment: pw.Alignment.centerRight),
                   dCell(
-                    !isSale ? '${PdfTheme.naira}$paymentReceived' : '—',
+                    !isSale ? '${PdfTheme.naira}$paymentReceived' : '-',
                     bold: !isSale,
                     alignment: pw.Alignment.centerRight,
                   ),
@@ -1841,7 +1847,7 @@ class _LedgerFeed extends StatelessWidget {
                           
                           final dateStr = DateFormat('dd/MM/yy').format(entry.date);
                           final descStr = isSale ? (entry.inItem ?? '') : '';
-                          final qtyStr = isSale ? entry.quantity?.toString() ?? '1' : '—';
+                          final qtyStr = isSale ? entry.quantity?.toString() ?? '1' : '-';
                           final priceStr = isSale ? fmt.format(entry.price) : (entry.outItem ?? '');
                           final totalAmtStr = fmt.format(entry.totalAmount);
                           final outStr = !isSale ? fmt.format(entry.totalAmount) : '—';
