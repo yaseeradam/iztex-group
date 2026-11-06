@@ -24,6 +24,16 @@ class FirestoreService {
   static const String canonicalPassword = 'iztex123';
   static const String canonicalUid = 'nLSxFUa0BFOdjgUJK7UuSKClqOz1';
 
+  /// Set to true once Firebase Auth has resolved at startup. All datasources
+  /// check this before their first .get() so iOS Safari doesn't serve a stale
+  /// offline cache on new sessions (the first query forces Source.server).
+  static bool _authReady = false;
+  static bool get isAuthReady => _authReady;
+
+  static void markAuthReady() {
+    _authReady = true;
+  }
+
   static String get currentUserId {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null && user.uid.isNotEmpty) {
@@ -57,7 +67,10 @@ class FirestoreService {
     final password = canonicalPassword ?? FirestoreService.canonicalPassword;
 
     var user = FirebaseAuth.instance.currentUser;
-    if (user != null && user.uid.isNotEmpty) return user;
+    if (user != null && user.uid.isNotEmpty) {
+      markAuthReady();
+      return user;
+    }
 
     for (int attempt = 1; attempt <= 3; attempt++) {
       try {
@@ -65,6 +78,7 @@ class FirestoreService {
           email: email,
           password: password,
         );
+        if (credential.user != null) markAuthReady();
         return credential.user;
       } catch (e) {
         if (e is FirebaseAuthException &&
@@ -74,6 +88,7 @@ class FirestoreService {
               email: email,
               password: password,
             );
+            if (credential.user != null) markAuthReady();
             return credential.user;
           } catch (e2) {
             debugPrint('[FIRESTORE AUTH ERROR] Create user attempt $attempt failed: $e2');
@@ -86,7 +101,9 @@ class FirestoreService {
         }
       }
     }
-    return FirebaseAuth.instance.currentUser;
+    final fallbackUser = FirebaseAuth.instance.currentUser;
+    if (fallbackUser != null) markAuthReady();
+    return fallbackUser;
   }
 
   /// One-time migration of any local Hive data into Firestore.
