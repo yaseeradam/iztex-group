@@ -6,7 +6,41 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="description" content="IZTEX GROUP - Modern Store & Bookkeeping Management System">
+  <meta name="description" content="IZTEX GROUP - Store & Bookkeeping Management System for IZTEX GROUP">
+
+  <!-- Force Auto-Clear Cache & Auto-Update System -->
+  <script>
+    (function() {
+      // 1. Instantly purge all CacheStorage so stale flutter files cannot be served
+      if ('caches' in window) {
+        caches.keys().then(function(names) {
+          names.forEach(function(name) { caches.delete(name); });
+        });
+      }
+
+      // 2. Unregister any existing service workers to disable stale offline caching
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          registrations.forEach(function(reg) { reg.unregister(); });
+        });
+      }
+
+      // 3. Compare server version and auto-refresh if a newer build exists
+      fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          var serverVersion = data.build_number || data.version || 'latest';
+          var localVersion = localStorage.getItem('app_build_version');
+          if (localVersion && localVersion !== serverVersion) {
+            localStorage.setItem('app_build_version', serverVersion);
+            window.location.reload(true);
+          } else {
+            localStorage.setItem('app_build_version', serverVersion);
+          }
+        })
+        .catch(function() {});
+    })();
+  </script>
 
   <!-- PWA & Theme color -->
   <meta name="theme-color" content="#0F172A">
@@ -27,7 +61,14 @@
   <link rel="manifest" href="manifest.json">
 
   <style>
-    html, body {
+    html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #0F172A;
+    }
+    body {
       margin: 0;
       padding: 0;
       width: 100%;
@@ -35,10 +76,14 @@
       background-color: #0F172A;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       overflow: hidden;
-      touch-action: manipulation;
-      -webkit-touch-callout: none;
-      -webkit-user-select: none;
-      user-select: none;
+      /* iOS PWA FIX: Do NOT apply -webkit-user-select:none or -webkit-touch-callout:none
+         on html/body — it swallows all tap/click events on iOS Safari standalone mode.
+         Flutter sets these on its own canvas element as needed. */
+    }
+    /* Flutter engine root - ensure pointer events are always enabled */
+    flt-glass-pane, flt-scene-host, flutter-view, flt-glass-pane * {
+      pointer-events: auto !important;
+      touch-action: auto !important;
     }
     #loading-splash {
       position: fixed;
@@ -66,9 +111,9 @@
       width: 100%;
       height: 100%;
       border-radius: 24px;
-      background: #0F3D91;
+      background: #6366F1;
       filter: blur(20px);
-      opacity: 0.45;
+      opacity: 0.35;
       animation: pulse 2s infinite ease-in-out;
     }
     .logo-img {
@@ -88,14 +133,14 @@
     }
     .app-subtitle {
       font-size: 13px;
-      color: #D4AF37;
+      color: #94A3B8;
       margin-bottom: 28px;
     }
     .spinner {
       width: 32px;
       height: 32px;
-      border: 3px solid rgba(212, 175, 55, 0.15);
-      border-top-color: #D4AF37;
+      border: 3px solid rgba(99, 102, 241, 0.15);
+      border-top-color: #6366F1;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
     }
@@ -169,13 +214,48 @@
           }
         }, 350);
       }
+      // iOS PWA standalone fix: re-enable touch events on Flutter canvas
+      // iOS Safari standalone mode sometimes resets pointer-events after first render
+      repairIosTouchEvents();
+    }
+
+    function repairIosTouchEvents() {
+      // Applies only when running as installed PWA on iOS (home screen)
+      var isIosPwa = (window.navigator.standalone === true) ||
+                     (window.matchMedia('(display-mode: standalone)').matches &&
+                      /iPad|iPhone|iPod/.test(navigator.userAgent));
+      if (!isIosPwa) return;
+
+      // Force pointer-events and touch-action on the Flutter rendering elements
+      var selectors = ['flt-glass-pane', 'flt-scene-host', 'flutter-view', 'canvas'];
+      selectors.forEach(function(sel) {
+        document.querySelectorAll(sel).forEach(function(el) {
+          el.style.pointerEvents = 'auto';
+          el.style.touchAction = 'auto';
+        });
+      });
+
+      // Also ensure document.body and html have no blocking styles
+      document.body.style.webkitUserSelect = 'auto';
+      document.body.style.webkitTouchCallout = 'default';
+      document.documentElement.style.webkitUserSelect = 'auto';
     }
 
     window.addEventListener('flutter-first-frame', dismissSplash);
     // Fallback: Ensure splash is removed after 3.5s so touches can never be trapped
     setTimeout(dismissSplash, 3500);
+    // Extra safety: re-run touch repair 1s after first frame fires
+    window.addEventListener('flutter-first-frame', function() {
+      setTimeout(repairIosTouchEvents, 1000);
+    });
   </script>
 
-  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    // Dynamically load flutter_bootstrap.js with cache-busting timestamp
+    var bootstrapScript = document.createElement('script');
+    bootstrapScript.src = 'flutter_bootstrap.js?v=' + Date.now();
+    bootstrapScript.async = true;
+    document.body.appendChild(bootstrapScript);
+  </script>
 </body>
 </html>
